@@ -3447,12 +3447,8 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
    way on to the cart */
 .cart-added { width: min(100% - 2 * var(--s-4), 460px); }
 .cart-added .co-dialog__head .icon-btn { flex: none; }
-.cart-added__title { display: flex; align-items: center; gap: var(--s-2); }
-.cart-added__ok {
-  flex: none; width: 22px; height: 22px; padding: 4px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--line-from), var(--line-to)); color: #fff;
-}
-.cart-added__item { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-5); }
+.cart-added .co-dialog__foot { grid-template-columns: 1fr; }
+.cart-added__item { display: flex; align-items: flex-start; gap: var(--s-4); padding: var(--s-5); }
 .cart-added__thumb {
   flex: none; width: 72px; height: 72px; object-fit: cover;
   border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--ink-950);

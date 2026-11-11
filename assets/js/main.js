@@ -2364,12 +2364,11 @@
         added.setAttribute('aria-labelledby', 'cart-added-title');
         added.innerHTML = `
           <div class="co-dialog__head">
-            <h2 class="co-dialog__title cart-added__title" id="cart-added-title">${icon('check', 'icon cart-added__ok')}Berhasil masuk keranjang</h2>
+            <h2 class="co-dialog__title" id="cart-added-title">Berhasil ditambahkan</h2>
             <button class="icon-btn" type="button" aria-label="Tutup" data-added-close>${icon('x')}</button>
           </div>
           <div class="cart-added__item" data-added-item></div>
           <div class="co-dialog__foot">
-            <button class="btn btn--secondary" type="button" data-added-close>Lanjut Belanja</button>
             <a class="btn btn--primary" href="${SITE}keranjang/">Lihat Keranjang</a>
           </div>`;
         document.body.appendChild(added);
