@@ -2151,7 +2151,7 @@
         if (settle(await ask())) return;
         checkBtn.disabled = false;
         checkBtn.removeAttribute('aria-busy');
-        checkText.textContent = 'Belum masuk. Cek lagi';
+        checkText.textContent = 'Belum masuk'; // short: on phones the button is half the bar
         announce('Pembayaran belum masuk.');
         setTimeout(() => { checkText.textContent = 'Cek Status'; }, 3000);
       });
