@@ -1,0 +1,6 @@
+node_modules/
+.wrangler/
+# Secrets for local runs. Real ones are set in the Cloudflare dashboard, never committed.
+.dev.vars
+# Generated: the printable sensi codes are secrets too.
+out/

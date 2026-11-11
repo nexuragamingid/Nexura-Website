@@ -1,0 +1,13 @@
+name = "nexura"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Daily clean-up of finished sessions and old attempt records (03:00 WIB).
+[triggers]
+crons = ["0 20 * * *"]
+
+# database_id is filled in once the database exists in the Cloudflare account.
+[[d1_databases]]
+binding = "DB"
+database_name = "nexura"
+database_id = "00000000-0000-0000-0000-000000000000"
