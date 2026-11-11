@@ -828,43 +828,6 @@ window.NEXURA = {
     promos: {},
   },
 
-  /*
-   * Sensi Pro Player (/sensi/). Every Nexura pack carries a QR; scanning it on the site, or with
-   * the phone camera (the QR is a link to /sensi/?kode=<code>), opens one pro player's settings.
-   *   players    who can come out of a pack. `image` is the portrait card in assets/img (.jpg);
-   *              `settings` are [label, value] rows, shown in this order. A value left null shows
-   *              as "Menyusul"
-   *
-   * Codes look like NX-XXXX-XXXX: eight characters from Crockford's base 32 (no I, L, O, U), the
-   * last a check character, so a mistyped code is refused rather than opening someone at random.
-   * The first character picks the player (its place in the alphabet, wrapped over the list).
-   * Codes to try, one per player in list order:
-   *   NX-0M9S-346Y  NX-1Q3D-25V5  NX-2T4F-5V3J  NX-37E3-S3E2  NX-428J-T975  NX-5KB6-CQ6R
-   *
-   * TODO: every value below is empty on purpose. Fill each player's real settings, approved by
-   * that player (PRD 6: quotes and claims must be true), before this page goes live.
-   * TODO: the check character only catches typos. Real codes need the server: one code per pack,
-   * checked against the printed batch and claimed once, so a QR photo shared online is worth
-   * one claim, not thousands.
-   */
-  sensi: {
-    game: 'Mobile Legends',
-    players: [
-      { id: 'jeje', name: 'Jeje Adriel', role: 'Streamer & Ex-Pro MLBB', image: 'creator-jeje',
-        settings: [['Sensitivitas Kamera', null], ['Tinggi Kamera', null], ['Mode Cast', null], ['Lock Target', null], ['Frame Rate', null], ['Kualitas Grafik', null]] },
-      { id: 'tazz', name: 'Tazz', role: 'Streamer & Pro MLBB', image: 'creator-tazz',
-        settings: [['Sensitivitas Kamera', null], ['Tinggi Kamera', null], ['Mode Cast', null], ['Lock Target', null], ['Frame Rate', null], ['Kualitas Grafik', null]] },
-      { id: 'alviro', name: 'Alviro', role: 'Streamer MLBB', image: 'creator-alviro',
-        settings: [['Sensitivitas Kamera', null], ['Tinggi Kamera', null], ['Mode Cast', null], ['Lock Target', null], ['Frame Rate', null], ['Kualitas Grafik', null]] },
-      { id: 'cadera', name: 'Cadera', role: 'Streamer & Pro MLBB', image: 'creator-cadera',
-        settings: [['Sensitivitas Kamera', null], ['Tinggi Kamera', null], ['Mode Cast', null], ['Lock Target', null], ['Frame Rate', null], ['Kualitas Grafik', null]] },
-      { id: 'ivan', name: 'Ivan', role: 'Streamer MLBB', image: 'creator-ivan',
-        settings: [['Sensitivitas Kamera', null], ['Tinggi Kamera', null], ['Mode Cast', null], ['Lock Target', null], ['Frame Rate', null], ['Kualitas Grafik', null]] },
-      { id: 'kabuki', name: 'Kabuki', role: 'Streamer MLBB', image: 'creator-kabuki',
-        settings: [['Sensitivitas Kamera', null], ['Tinggi Kamera', null], ['Mode Cast', null], ['Lock Target', null], ['Frame Rate', null], ['Kualitas Grafik', null]] },
-    ],
-  },
-
   // Compilation video for "Apa Kata Streamers". Paste the YouTube video ID (the part after v=).
   video: {
     youtubeId: '',

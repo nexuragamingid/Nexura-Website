@@ -10,3 +10,6 @@
 
 # Tungsten (Hoefler&Co) is unlicensed for now: local use only, never published
 assets/img/Tungsten-Font/
+
+# Personal editor workspaces
+*.code-workspace

@@ -161,12 +161,12 @@
   };
 
   /* ------------------------------------------------------------------
-     Accounts (Masuk, Daftar, Akun), the order history and the sensi a buyer has opened.
+     Accounts (Masuk, Daftar, Akun) and the order history.
      TODO: there is no server yet, so all of it lives in this browser's localStorage: the users
-     (each password kept only as a salted hash), who is signed in, their paid orders and their
-     sensi. Enough to click every flow through, and no more: nothing follows the user to another
-     device, and anyone at this browser can read it. When the backend exists, swap the bodies of
-     `account`, `orderBook` and `sensiBook` for calls to it; the pages only talk to these three.
+     (each password kept only as a salted hash), who is signed in and their paid orders. Enough
+     to click every flow through, and no more: nothing follows the user to another device, and
+     anyone at this browser can read it. When the backend exists, swap the bodies of `account`
+     and `orderBook` for calls to it; the pages only talk to these two.
      ------------------------------------------------------------------ */
   const LOGIN_PAGE = `${SITE}masuk/`;
   const SIGNUP_PAGE = `${SITE}daftar/`;
@@ -174,7 +174,6 @@
   const USERS_KEY = 'nexura-users-v1';
   const SESSION_KEY = 'nexura-session-v1';
   const ORDERS_KEY = 'nexura-orders-v1';
-  const SENSI_KEY = 'nexura-sensi-v1';
 
   // crypto.subtle only exists on https and localhost. A phone opening the dev server over the
   // LAN gets FNV-1a instead, marked so a stored hash is always checked the way it was made.
@@ -216,10 +215,7 @@
       account.start(user.email);
       return true;
     },
-    start(email) {
-      storage.set(SESSION_KEY, { email, at: Date.now() });
-      sensiBook.claimGuest(email);
-    },
+    start(email) { storage.set(SESSION_KEY, { email, at: Date.now() }); },
     signOut() { try { localStorage.removeItem(SESSION_KEY); } catch { /* nothing to clear */ } },
     // false when the current password is wrong
     async changePassword(current, next) {
@@ -232,8 +228,8 @@
       account.update({ salt, hash: await digest(`${salt}:${next}`), pwChanged: Date.now() });
       return true;
     },
-    // 'ok', or 'exists' when the new email has an account. Orders and saved sensi move to the
-    // new address with the account.
+    // 'ok', or 'exists' when the new email has an account. Orders move to the new address with
+    // the account.
     changeEmail(next) {
       const me = account.current();
       if (!me) return 'exists';
@@ -247,8 +243,6 @@
       storage.set(ORDERS_KEY, orderBook.all().map((o) => (o.user === me.email ? { ...o, user: key } : o)));
       const pending = storage.get(ORDER_KEY);
       if (pending?.user === me.email) storage.set(ORDER_KEY, { ...pending, user: key });
-      const sensi = sensiBook.all();
-      if (sensi[me.email]) { sensi[key] = sensi[me.email]; delete sensi[me.email]; storage.set(SENSI_KEY, sensi); }
       storage.set(SESSION_KEY, { ...storage.get(SESSION_KEY), email: key });
       return 'ok';
     },
@@ -269,31 +263,6 @@
       storage.set(ORDERS_KEY, [order, ...orderBook.all().filter((o) => o.id !== order.id)].slice(0, 50));
     },
     of: (email) => orderBook.all().filter((o) => o.user === email),
-  };
-
-  // Sensi opened, per owner: the account's email, or 'guest' until someone signs in on this
-  // browser, when the guest's sensi move into that account.
-  const sensiBook = {
-    all: () => storage.get(SENSI_KEY) || {},
-    owner: () => account.current()?.email || 'guest',
-    list: (owner = sensiBook.owner()) => sensiBook.all()[owner] || [],
-    // true when the code is new to this owner
-    add(entry, owner = sensiBook.owner()) {
-      const all = sensiBook.all();
-      const list = all[owner] || [];
-      if (list.some((e) => e.code === entry.code)) return false;
-      all[owner] = [entry, ...list];
-      storage.set(SENSI_KEY, all);
-      return true;
-    },
-    claimGuest(email) {
-      const all = sensiBook.all();
-      if (!all.guest?.length) return;
-      const mine = all[email] || [];
-      all[email] = [...all.guest.filter((g) => !mine.some((e) => e.code === g.code)), ...mine];
-      delete all.guest;
-      storage.set(SENSI_KEY, all);
-    },
   };
 
   // A page's address relative to the site root, for ?lanjut= (where to go after signing in).
@@ -326,7 +295,6 @@
       a.classList.toggle('is-signed-in', !!me);
     });
     $$('[data-account-drawer-label]').forEach((el) => { el.textContent = me ? 'Akun Saya' : 'Masuk / Daftar'; });
-    $$('[data-guest-only]').forEach((el) => { el.hidden = !!me; });
 
     // the account's pages, drawn the same in the navbar dropdown and the menu drawer
     const ICONS = {
@@ -3025,106 +2993,6 @@
       phone.addEventListener('change', apply);
       apply();
     }
-  }
-
-  /* ------------------------------------------------------------------
-     Tentang Kami: light beams behind the opening
-     ------------------------------------------------------------------ */
-  /* A port of the "Beams Background" React component to plain canvas. Thirty soft columns of
-     light lean across the section and drift upward; each pulses gently and, once it has risen
-     off the top, comes back in from the bottom in one of three lanes so the light stays spread.
-     Recoloured from the original's cyan-blue (hue 190-260) to the brand's violet-to-magenta
-     (hue ~265-300, #8E48C4 to #DB4DFF). The blur is CSS on the canvas, so the canvas itself is
-     drawn at a quarter of the screen's resolution: the blur hides it and the drawing gets far
-     cheaper. It sizes to its section, stops while off screen or in a background tab, and draws
-     one still frame for readers who ask for reduced motion. */
-  const beamsBox = $('[data-beams]');
-  const beamsCanvas = beamsBox && $('canvas', beamsBox);
-  const beamsCtx = beamsCanvas && beamsCanvas.getContext('2d');
-  if (beamsCtx) {
-    const COUNT = 30;
-    const SCALE = 0.25;
-    const HUE = [265, 300];
-    let w = 0, h = 0, beams = [], frame = 0, last = 0, visible = true;
-    // Beam widths were made for a desktop screen; on a phone the same widths overlap into one
-    // even wash under the blur. They scale with the section's width instead (down to 40%).
-    let k = 1;
-
-    const makeBeam = () => ({
-      x: Math.random() * w * 1.5 - w * 0.25,
-      y: Math.random() * h * 1.5 - h * 0.25,
-      width: (30 + Math.random() * 60) * k,
-      length: h * 2.5,
-      angle: -35 + Math.random() * 10,
-      speed: 0.6 + Math.random() * 1.2,
-      opacity: 0.12 + Math.random() * 0.16,
-      hue: HUE[0] + Math.random() * (HUE[1] - HUE[0]),
-      pulse: Math.random() * Math.PI * 2,
-      pulseSpeed: 0.02 + Math.random() * 0.03,
-    });
-    function resetBeam(beam, i) {
-      const lane = w / 3;
-      beam.y = h + 100;
-      beam.x = (i % 3) * lane + lane / 2 + (Math.random() - 0.5) * lane * 0.5;
-      beam.width = (100 + Math.random() * 100) * k;
-      beam.speed = 0.5 + Math.random() * 0.4;
-      beam.hue = HUE[0] + (i * (HUE[1] - HUE[0])) / COUNT;
-      beam.opacity = 0.2 + Math.random() * 0.1;
-    }
-    function drawBeam(b) {
-      // x1.9: the original's strength, which its full-resolution canvas and lighter page lost here
-      // and narrower beams carry less light, so they burn brighter in step (up to x1.5 on a phone)
-      const a = Math.min(1, b.opacity * (0.8 + Math.sin(b.pulse) * 0.2) * 1.9 * (1 + (1 - k) * 0.8));
-      const c = (k) => `hsla(${b.hue}, 85%, 62%, ${a * k})`;
-      beamsCtx.save();
-      beamsCtx.translate(b.x, b.y);
-      beamsCtx.rotate((b.angle * Math.PI) / 180);
-      const g = beamsCtx.createLinearGradient(0, 0, 0, b.length);
-      g.addColorStop(0, c(0)); g.addColorStop(0.1, c(0.5)); g.addColorStop(0.4, c(1));
-      g.addColorStop(0.6, c(1)); g.addColorStop(0.9, c(0.5)); g.addColorStop(1, c(0));
-      beamsCtx.fillStyle = g;
-      beamsCtx.fillRect(-b.width / 2, 0, b.width, b.length);
-      beamsCtx.restore();
-    }
-    function paint(step) {
-      beamsCtx.setTransform(1, 0, 0, 1, 0, 0);
-      beamsCtx.clearRect(0, 0, beamsCanvas.width, beamsCanvas.height);
-      beamsCtx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
-      beams.forEach((b, i) => {
-        b.y -= b.speed * step;
-        b.pulse += b.pulseSpeed * step;
-        if (b.y + b.length < -100) resetBeam(b, i);
-        drawBeam(b);
-      });
-    }
-    function size() {
-      const r = beamsBox.getBoundingClientRect();
-      w = r.width; h = r.height;
-      k = Math.min(1, Math.max(0.4, w / 1280));
-      beamsCanvas.width = Math.max(1, Math.round(w * SCALE));
-      beamsCanvas.height = Math.max(1, Math.round(h * SCALE));
-      beams = Array.from({ length: COUNT }, makeBeam);
-      if (reducedMotion.matches) paint(0);
-    }
-    // Movement is per 60th of a second, so the drift is the same speed on any refresh rate.
-    function tick(t) {
-      const step = last ? Math.min((t - last) / (1000 / 60), 3) : 1;
-      last = t;
-      paint(step);
-      frame = requestAnimationFrame(tick);
-    }
-    const run = () => {
-      cancelAnimationFrame(frame); frame = 0; last = 0;
-      if (reducedMotion.matches) { paint(0); return; }
-      if (visible && !document.hidden) frame = requestAnimationFrame(tick);
-    };
-
-    size();
-    run();
-    new ResizeObserver(() => { size(); if (!frame) run(); }).observe(beamsBox);
-    new IntersectionObserver(([e]) => { visible = e.isIntersecting; run(); }).observe(beamsBox);
-    document.addEventListener('visibilitychange', run);
-    reducedMotion.addEventListener('change', run);
   }
 
   /* ------------------------------------------------------------------

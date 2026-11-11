@@ -93,7 +93,6 @@ html { zoom: var(--zoom); }
   /* Type */
   --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --fs-display: clamp(3.375rem, 2.3rem + calc(1.67 * var(--vw)), 4.3125rem);
-  --fs-h2: clamp(1.625rem, 1.15rem + calc(1.5 * var(--vw)), 2.5rem);
   --fs-h3: clamp(1.125rem, 1rem + calc(.4 * var(--vw)), 1.375rem);
   --fs-lead: clamp(1rem, .95rem + calc(.25 * var(--vw)), 1.125rem);
   --fs-body: 1rem;
@@ -229,7 +228,6 @@ s { text-decoration-thickness: 1px; }
 
 .btn--secondary { background: transparent; color: var(--text); border-color: var(--line-strong); }
 .btn--secondary:hover { background: var(--ink-800); border-color: #664878; }
-
 
 .btn:disabled, .btn[aria-disabled="true"] {
   background: var(--disabled-bg); border-color: transparent; color: var(--disabled-fg); cursor: not-allowed;
@@ -432,29 +430,6 @@ html:has(.search-dialog[open]) { overflow: hidden; }
     border-radius: var(--r-sm); font-size: var(--fs-sm); font-weight: 500; color: var(--text-soft);
   }
   .dropdown a:hover { background: var(--ink-800); color: var(--text); }
-  /* Picture, name, tagline, chevron — the category reads as a destination, not a filter. */
-  .dropdown .dropdown__item {
-    display: grid; grid-template-columns: 84px 1fr auto; align-items: center;
-    gap: var(--s-3); padding: var(--s-2) var(--s-3); border-radius: 0;
-  }
-  .dropdown__item + .dropdown__item { border-top: 1px solid var(--line); }
-  /* Square, because the product shots are square cards with their own lockups baked in —
-     a landscape box would crop straight through the product or its name. The wrapper clips
-     the scale, which trims the pale rim baked into the edge of the source cards. */
-  .dropdown__thumb {
-    display: block; width: 84px; height: 84px; overflow: hidden;
-    border-radius: var(--r-sm); background: var(--ink-800);
-  }
-  .dropdown__thumb img { width: 100%; height: 100%; object-fit: cover; scale: 1.1; }
-  .dropdown__text { display: grid; gap: 2px; min-width: 0; }
-  .dropdown__name {
-    font-size: 1.0625rem; font-weight: 700; letter-spacing: -.01em;
-    color: var(--text);
-  }
-  .dropdown__chev { width: 20px; height: 20px; color: var(--faint); transition: transform var(--t-fast) ease-out, color var(--t-fast) ease-out; }
-  .dropdown__item:hover .dropdown__name { color: var(--violet-400); }
-  .dropdown__item:hover .dropdown__chev { color: var(--violet-400); transform: translateX(3px); }
-  .dropdown__all { margin-top: var(--s-1); border-top: 1px solid var(--line); border-radius: 0 0 var(--r-sm) var(--r-sm) !important; color: var(--lilac-300) !important; }
 
   .nav__actions { gap: var(--s-2); }
   .nav__account { display: inline-grid; }
@@ -885,9 +860,6 @@ body.is-overlay-open .shooting-stars span { animation-play-state: paused; }
 /* The extra air goes above the headline only; below it, margin-bottom alone sets the gap, so the
    title sits closer to the content it introduces than to the section that came before. */
 .section-head { text-align: center; padding-top: var(--head-y); margin-bottom: calc((var(--section-y) + var(--head-y)) / 2); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-2); justify-items: center; }
-/* Separates this sub-head from the video above it the way --section-y separates whole sections;
-   .section-head's own padding-top then adds the headline's air on top of that. */
-.section-head--sub { margin-top: var(--s-5); }
 /* Every section headline is Draco, one weight (400 set explicitly). Drawn wide and flat, so
    it is squeezed to 63% width; the box is allowed 1/.63 of the column so it wraps where the
    squeezed text fills it. Drawn leaning ~29deg too, so skewX stands it upright (main.js moves
@@ -911,10 +883,6 @@ body.is-overlay-open .shooting-stars span { animation-play-state: paused; }
 /* The box runs .287em past Draco's baseline; taken back out so the gap under it measures to
    the type. */
 .section-head .section-title:not(.section-title--sub) { margin-bottom: -.287em; }
-/* A heading inside a section, under its headline ("Clip dari Live Mereka" under Apa Kata
-   Streamers): the same face, at about 60% of the headline's size, so it reads as a part of the
-   section rather than a second one starting. */
-.section-title--sub { font-size: clamp(1rem, .45rem + calc(1.8 * var(--vw)), 1.5rem); }
 /* Beranda's headlines (the only page with .section-head) run big, after the Produk Andalan
    mock-up: "PRODUK ANDALAN" on one line about 45% of the column wide (some 1.9 cards on
    desktop), so 6.8% of the column (cqi), 82px at the 1200px column. Phones go bigger, 11.8% of
@@ -923,29 +891,16 @@ body.is-overlay-open .shooting-stars span { animation-play-state: paused; }
 .section-head { container-type: inline-size; }
 .section-head .section-title { font-size: clamp(1.5rem, calc(4.4 * var(--cqi)), 3.25rem); line-height: 1.05; }
 @media (max-width: 599px) { .section-head .section-title { font-size: calc(6.4 * var(--cqi)); } }
-/* the home sub-head ("Clip dari Live Mereka"): small, a quiet label between the video and the
-   clips rather than a second headline. On a phone it runs nearly the column's width (about 16px
-   at 390, 19px at 445) and tops out at 28px from about 630px; desktops grow it again, to 34px
-   at 1440 */
-.section-head .section-title--sub { font-size: clamp(.9375rem, calc(4.82 * var(--vw)) - 2.3px, 1.75rem); }
-@media (min-width: 1024px) { .section-head .section-title--sub { font-size: clamp(1.75rem, 1rem + calc(1.5 * var(--vw)), 2.125rem); } }
 /* A line break only phones take (see "Teknologi Ter- / Nyata"). */
 @media (min-width: 600px) { .br-phone { display: none; } }
 /* keeps a hyphenated word (Ter-Nyata) whole, so a line never breaks at its hyphen */
 .nowrap { white-space: nowrap; }
-.section-sub { font-size: var(--fs-lead); color: var(--mute); max-width: 32ch; text-wrap: balance; }
-/* Every section's supporting line sits one step under body on a phone, so the headline carries
-   the section on its own and the rail or grid below starts sooner. */
-@media (max-width: 599px) { .section-sub { font-size: var(--fs-sm); } }
 
 @media (min-width: 600px) {
   .section-head { margin-bottom: calc((var(--section-y) + var(--head-y)) / 2); }
-  .section-sub { max-width: 52ch; }
-  .section-head--sub { margin-top: var(--s-6); }
 }
 @media (min-width: 1024px) {
   .section-head { margin-bottom: calc((var(--section-y) + var(--head-y)) / 2); gap: var(--s-3); }
-  .section-head--sub { margin-top: var(--s-7); }
 }
 
 /* ---------- Product cards ---------- */
@@ -993,7 +948,6 @@ body.is-overlay-open .shooting-stars span { animation-play-state: paused; }
   width: 100%; height: 100%; object-fit: cover;
   transition: transform 400ms var(--ease), opacity var(--t-fast) ease-out;
 }
-.product-card__media img.is-swapping { opacity: .4; }
 .product-card.is-out .product-card__media img { filter: saturate(.55) brightness(.6); }
 /* Centred over the dimmed picture. The card carries no link while sold out, so it also drops
    the hover lift and zoom below. */
@@ -2255,26 +2209,6 @@ a.cmp__media:focus-visible { outline-offset: 3px; }
 }
 
 /* ---------- Divider between the video and the clips ---------- */
-/* Two hairlines in the brand's purple-to-pink, with the sub-heading between them: small bold
-   Inter capitals, spaced out, in lilac. The width of the column, so the lines end level with
-   the outer edges of the first and last clip cards on screen. The same air above and below,
-   24/32/48. */
-.clips-divider {
-  display: flex; align-items: center; gap: var(--s-3);
-  margin-block: var(--s-5);
-}
-@media (min-width: 600px) { .clips-divider { margin-block: var(--s-6); gap: var(--s-4); } }
-@media (min-width: 1024px) { .clips-divider { margin-block: var(--s-7); gap: var(--s-5); } }
-/* violet at the card edges, brightening to pink at the words */
-.clips-divider__line { flex: 1; min-width: var(--s-4); height: 1px; background: linear-gradient(90deg, var(--line-from), var(--line-to)); }
-.clips-divider__line:last-child { background: linear-gradient(90deg, var(--line-to), var(--line-from)); }
-.clips-divider__text {
-  flex: none; margin: 0; white-space: nowrap;
-  font-size: .75rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; line-height: 1;
-  color: var(--lilac-300);
-}
-@media (min-width: 600px) { .clips-divider__text { font-size: .875rem; } }
-@media (min-width: 1024px) { .clips-divider__text { font-size: 1rem; letter-spacing: .22em; } }
 
 /* ---------- Clip strip ("Clip dari Live Mereka"), saved, not in use ---------- */
 /* The sub-heading under the video, as a band running edge to edge of the screen with the line
@@ -2602,9 +2536,6 @@ body.is-overlay-open .rail-dots button[aria-current="true"]::after { animation-p
 /* Tokopedia's wordmark has no bag of its own, unlike Shopee's, so its Toped bag goes in front;
    a touch taller than the letters, the way it sits in the app icon. */
 .mp .mp__bag { height: 18px; margin-block: -2px; }
-/* Shopee's mark carries its bag inside the same image, so its letters only fill half the
-   height; sized up to match the Tokopedia lettering. */
-.mp .mp__shopee { height: 19px; margin-block: -3px; }
 /* TikTok Shop has no wordmark file here: its note glyph from the sprite, set in black beside
    the name, the way the shop badge reads in the Tokopedia app. */
 .mp--tiktok { color: #000; font-size: 12px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
@@ -2881,26 +2812,6 @@ body.is-overlay-open .marquee__row { animation-play-state: paused; }
 @media (max-width: 599px) { .cta-banner__media { aspect-ratio: 1080 / 1485; } }
 
 /* ---------- Banner placeholders ---------- */
-/* Stand-ins for banner art not made yet (assets/img/placeholder). The dashed frame is drawn
-   here on the box itself rather than in the image, because the boxes crop their images
-   differently at every width: drawn on the box it always sits on its edges. */
-.is-placeholder::before {
-  content: ""; position: absolute; inset: 12px; z-index: 2; pointer-events: none;
-  border: 2px dashed #8E48C4; border-radius: 12px;
-}
-/* The products banner's label, kept out of its image (the picture is cropped differently at
-   each width, so a label drawn into it drifts). Centred on the picture from 768 up; on a phone
-   the picture is the background under the copy, so the label stays off. */
-.ph-tag { display: none; }
-@media (min-width: 768px) {
-  .ph-tag {
-    position: absolute; z-index: 3; top: 50%; left: 68%; translate: -50% -50%; pointer-events: none;
-    display: grid; justify-items: center; gap: 4px; padding: 14px 22px; border-radius: 12px;
-    background: rgba(22, 10, 31, .88); color: #C9B6D8; font-size: .9375rem; line-height: 1.35;
-    white-space: nowrap; text-align: center;
-  }
-  .ph-tag strong { color: #fff; font-size: 1.375rem; }
-}
 
 /* ---------- Footer ---------- */
 /* A dark plum (between ink-900 and plum-800), so the footer reads as its own band against the
@@ -2988,7 +2899,6 @@ body.is-overlay-open .marquee__row { animation-play-state: paused; }
   .drawer__head .icon-btn--round { width: 36px; height: 36px; background: none; }
   .drawer__head .icon-btn--round .icon { width: 20px; height: 20px; }
 }
-.drawer__title { font-size: 1.125rem; font-weight: 700; }
 .drawer__logo { height: 24px; width: auto; }
 .drawer__body { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
 .drawer__foot { border-top: 1px solid var(--line); padding: var(--s-4) var(--s-5) calc(var(--s-5) + env(safe-area-inset-bottom)); display: grid; gap: var(--s-4); }
@@ -3015,9 +2925,6 @@ body.is-overlay-open .marquee__row { animation-play-state: paused; }
   font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
   color: var(--lilac-300);
 }
-/* Bantuan's pages, indented under their heading like Produk's categories. */
-.menu-sub { display: grid; gap: var(--s-1); }
-.menu-list__item--sub { min-height: 44px; padding-left: var(--s-5); font-size: 1rem; font-weight: 500; }
 .menu-cats { display: grid; gap: var(--s-1); padding-bottom: var(--s-2); margin-bottom: var(--s-2); border-bottom: 1px solid var(--line); }
 /* the rule only separates the categories from links after them; last in the menu, it goes */
 .menu-cats:last-child { border-bottom: 0; margin-bottom: 0; }
@@ -3071,8 +2978,6 @@ body.is-overlay-open .marquee__row { animation-play-state: paused; }
 .menu-cat__thumb img { width: 100%; height: 100%; object-fit: cover; }
 .menu-cat__name { flex: 1 1 auto; min-width: 0; }
 .menu-cat__chev { flex: none; color: var(--faint); }
-/* Lihat Semua: a plain row under the photos, its text on the menu's left edge */
-.menu-cat--all { min-height: 48px; padding-left: var(--s-3); color: var(--text); font-size: var(--fs-sm); }
 
 /* cart: the tick box the cart page's lines and select-all bar share */
 .cart-item__check { display: grid; place-items: center; width: 28px; margin-left: -4px; cursor: pointer; }
@@ -3693,7 +3598,6 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
 }
 .pay-steps__list strong { color: var(--text); font-weight: 600; }
 
-
 @media (max-width: 899px) {
   .pay-dock {
     position: fixed; inset: auto 0 0; z-index: 38;
@@ -3747,211 +3651,10 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
 .paid-card__note strong { color: var(--text); font-weight: 600; white-space: nowrap; }
 .paid-card__actions { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); margin-top: var(--s-5); }
 
-/* ---------- Tentang Kami ---------- */
-/* After GameSir's About page: a title and an intro opening the page (here over a screen of
-   light beams, see .about-head), then technology,
-   values, proof, figures, socials and a closing pair of buttons. Every section shares one
-   vertical rhythm, and each split pairs text with one picture. */
-.about > section { padding-block: calc(var(--section-y) * 1.5); }
-.about-eyebrow {
-  font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--lilac-300);
-}
-
-/* The opening fills the screen under the navbar: the headline and intro centred over drifting
-   beams of light. The canvas is drawn at a fraction of the screen's resolution and blurred
-   here instead, which is what makes the beams soft and keeps the drawing cheap. A veil of the
-   page colour breathes over it, so the light swells and settles. */
-.about-head {
-  position: relative; isolation: isolate; overflow: hidden;
-  display: grid; place-items: center;
-  min-height: calc(calc(100 * var(--svh)) - var(--header-h));
-  padding-block: var(--s-8) !important;
-  background: var(--ink-950);
-}
-.about-head__beams {
-  position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%;
-  filter: blur(32px); transform: scale(1.1);
-}
-.about-head__veil {
-  position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(ellipse 60% 40% at 50% 50%, rgba(12, 3, 16, .45), transparent 75%),
-    linear-gradient(180deg, transparent 70%, var(--ink-950));
-  animation: about-veil 10s ease-in-out infinite;
-}
-@keyframes about-veil { 50% { opacity: .75; } }
-.about-head__text {
-  display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: var(--s-3); text-align: center;
-  animation: about-rise 800ms var(--ease) both;
-}
-@keyframes about-rise { from { opacity: 0; translate: 0 20px; } }
-/* the home page's section headline size (.section-head .section-title) */
-.about-head__title { font-size: clamp(1.5rem, .75rem + calc(3.1 * var(--vw)), 3rem); }
-/* Kept narrower than the headline above it at every width: "TENTANG KAMI" sets about 11.9x
-   its font size wide, so the line is capped at 10x the same size. */
-.about-lead { max-width: min(75%, calc(clamp(1.5rem, .75rem + calc(3.1 * var(--vw)), 3rem) * 10)); font-size: 1rem; line-height: 1.6; color: var(--text-soft); }
-/* a lighter blur on phones, in step with the narrower beams, so each stays a beam */
-@media (max-width: 767px) {
-  .about-head__beams { filter: blur(18px); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .about-head__veil, .about-head__text { animation: none; }
-}
-
-.about-split__inner { display: grid; gap: var(--s-6); align-items: center; }
-.about-split__text { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; gap: var(--s-4); color: var(--text-soft); line-height: 1.6; }
-.about-split__title { font-size: clamp(1.5rem, .9rem + calc(2.4 * var(--vw)), 2.75rem); transform-origin: left; }
-/* Less air under each Tentang Kami headline than the column's gap gives: 10 under the split
-   titles (gap 16), 6 under the centred ones (gap 12). */
-.about-split__title, .about-head__title { margin-bottom: -6px; }
-/* section headlines: the air under them is half the air above (the section's 1.5 x --section-y) */
-.about-social__title, .about-cta__title { margin-bottom: calc(var(--section-y) * .75 - var(--s-3)); }
-.about-split__media { margin: 0; }
-.about-split__media img {
-  width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--r-lg);
-}
-.about-points { display: grid; gap: var(--s-4); margin: var(--s-2) 0 0; padding: 0; list-style: none; }
-.about-points li { display: flex; gap: var(--s-3); align-items: flex-start; }
-.about-points .icon {
-  flex: none; width: 40px; height: 40px; padding: 10px; border-radius: var(--r-sm);
-  background: var(--ink-800); border: 1px solid var(--line); color: var(--violet-400);
-}
-.about-points strong { color: var(--text); }
-
-.about-values { padding-top: 0 !important; }
-.about-values__grid { display: grid; gap: var(--s-4); margin: 0; padding: 0; list-style: none; }
-.about-value {
-  display: grid; align-content: start; gap: var(--s-3); padding: var(--s-5);
-  background: var(--ink-900); border: 1px solid var(--line); border-radius: var(--r-md);
-  color: var(--mute); line-height: 1.6;
-}
-.about-value__icon {
-  display: grid; place-items: center; width: 48px; height: 48px; border-radius: 999px;
-  background: linear-gradient(120deg, #6A2E9E, #B33AC6); color: #fff;
-}
-.about-value__icon .icon { width: 22px; height: 22px; }
-.about-value__title { font-size: 1.125rem; font-weight: 700; color: var(--text); }
-
-/* Proof: the creators by name, each a small card, and a way to the clips on the home page. */
-.about-names { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); width: 100%; margin: var(--s-2) 0 0; padding: 0; list-style: none; }
-.about-names li {
-  display: grid; gap: 2px; padding: var(--s-3);
-  background: var(--ink-900); border: 1px solid var(--line); border-radius: var(--r-sm);
-  line-height: 1.3;
-}
-.about-names strong, .about-names span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.about-names strong { color: var(--text); }
-.about-names span { font-size: var(--fs-xs); color: var(--faint); }
-/* the narrowest phones: a step smaller and a little less padding, so the longest tag fits */
-@media (max-width: 359px) {
-  .about-names li { padding-inline: 10px; }
-  .about-names span { font-size: 12px; }
-}
-.link-arrow { display: inline-flex; align-items: center; gap: var(--s-2); font-weight: 600; color: var(--lilac-300); }
-.link-arrow:hover { color: var(--text); }
-.link-arrow .icon { transition: translate var(--t-fast) ease-out; }
-.link-arrow:hover .icon { translate: 3px 0; }
-
-.about-stats { margin-top: 0; }
-
-.about-social { text-align: center; }
-.about-social .container, .about-cta__inner { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: var(--s-3); }
-.about-social__title, .about-cta__title { font-size: clamp(1.5rem, .9rem + calc(2.4 * var(--vw)), 2.75rem); }
-.about-social__sub, .about-cta__sub { max-width: 46ch; color: var(--mute); line-height: 1.6; }
-.about-social__list { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-2); margin: var(--s-3) 0 0; padding: 0; list-style: none; }
-.about-social__link { height: 48px; padding-inline: var(--s-5); }
-.about-social__link .icon { width: 20px; height: 20px; }
-
-/* GameSir closes on "Explore" with two buttons; so does this, on a plum glow under the
-   navbar's gradient line. */
-.about-cta {
-  text-align: center;
-  border-top: 1px solid var(--line-from);
-  border-image: linear-gradient(90deg, var(--line-from), var(--line-to)) 1;
-  background:
-    radial-gradient(60% 80% at 50% 0%, rgba(142, 72, 196, .28), transparent 70%),
-    linear-gradient(180deg, var(--plum-800), var(--ink-950));
-}
-.about-cta__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-3); margin-top: var(--s-3); }
-
-@media (max-width: 599px) {
-  .about-cta__actions { display: grid; width: 100%; }
-}
-@media (min-width: 768px) {
-  .about-values__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .about-names { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (min-width: 900px) {
-  .about-split__inner { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-8); }
-  .about-split--flip .about-split__media { order: -1; }
-}
-
-/* ---------- Hubungi Kami ---------- */
-/* Navbar, a title band, the content, the footer. The band is the page's one coloured surface,
-   filled in the stats band's purple (violet-600 into violet-700, the violet-500 rim) with the
-   streamers texture worked into it. */
-.contact-head {
-  position: relative; isolation: isolate;
-  margin-top: var(--section-y);
-  padding-block: var(--s-7);
-  text-align: center;
-  background: linear-gradient(115deg, var(--violet-600) 0%, var(--violet-700) 100%);
-  border-block: 1px solid var(--violet-500);
-}
-/* The Apa Kata Streamers texture, blended into the purple so the band keeps its colour and takes
-   the texture's grain and glow; the stats band's white sheen sits over both. Stretched, as on
-   the home page, so its violet corner glows stay in frame. */
-.contact-head::before {
-  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: url("../img/bg-streamers.jpg") center / 100% 100% no-repeat;
-  mix-blend-mode: soft-light;
-}
-.contact-head::after {
-  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, 0) 52%);
-}
-.contact-head__inner { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: var(--s-3); }
-/* the home page's section headline size */
-.contact-head__title { font-size: clamp(1.5rem, .75rem + calc(3.1 * var(--vw)), 3rem); }
-/* Trimmed to its last baseline, as the headline is trimmed to its capitals, so the purple under
-   the text measures the same as the purple over it. */
-.contact-head__sub { max-width: 42ch; font-size: 1rem; line-height: 1.6; color: #fff; text-box-trim: trim-end; text-box-edge: cap alphabetic; }
-
-.contact-section { padding-block: calc(var(--section-y) * 1.5) 0; }
-/* the first one sits the same distance under the band as the band sits under the navbar */
-.contact-head + .contact-section { padding-top: var(--section-y); }
-.contact-section:last-child { padding-bottom: calc(var(--section-y) * 1.5); }
-/* Centred by its own width, not auto margins: unsqueezed it can be wider than a phone's column,
-   and auto margins can't pull an over-wide box back left, so it hung off to the right. */
-.contact-section__title { margin: 0 0 calc(var(--section-y) * .75) 50%; translate: -50% 0; font-size: clamp(1.25rem, .8rem + calc(1.8 * var(--vw)), 2rem); }
-
-/* GameSir's partner card: a white icon tile, title and copy beside it, an outlined pill under. */
-.contact-cards { display: grid; gap: var(--s-4); margin: 0; padding: 0; list-style: none; }
-.contact-card {
-  display: grid; justify-items: start; gap: var(--s-5); padding: var(--s-5);
-  background: var(--ink-900); border: 1px solid var(--line); border-radius: var(--r-md);
-}
-.contact-card__head { display: flex; gap: var(--s-4); align-items: flex-start; }
-.contact-card__icon {
-  flex: none; display: grid; place-items: center; width: 52px; height: 52px;
-  border-radius: var(--r-md); background: #fff; color: var(--ink-950);
-}
-.contact-card__icon .icon { width: 26px; height: 26px; }
-.contact-card__text { display: grid; gap: var(--s-1); }
-.contact-card__title { font-size: 1.125rem; font-weight: 700; line-height: 1.3; }
-.contact-card__text p { color: var(--mute); line-height: 1.6; }
-.contact-card__btn {
-  display: inline-flex; align-items: center; gap: var(--s-2); min-height: 44px; padding: 0 var(--s-5);
-  border: 1px solid var(--line-strong); border-radius: 999px;
-  font-size: var(--fs-sm); font-weight: 600; color: var(--text);
-  transition: border-color var(--t-fast) ease-out, background-color var(--t-fast) ease-out;
-}
-.contact-card__btn:hover { border-color: #8E48C4; background: var(--ink-800); }
-.contact-card__btn .icon { transition: translate var(--t-fast) ease-out; }
-.contact-card__btn:hover .icon { translate: 3px 0; }
-
+/* ---------- FAQ and Hubungi Kami ---------- */
+/* Where else to find us (Hubungi Kami): the shop and social links, two to a row, four from 768. */
 .find-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); margin: 0; padding: 0; list-style: none; }
+@media (min-width: 768px) { .find-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .find-card {
   position: relative; display: grid; gap: 2px; height: 100%; padding: var(--s-4);
   background: var(--ink-900); border: 1px solid var(--line); border-radius: var(--r-md);
@@ -3998,12 +3701,6 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
 .faq__item[open] .faq__chev { rotate: 45deg; color: var(--violet-400); }
 .faq__item p { padding-bottom: var(--s-4); max-width: 68ch; color: var(--mute); line-height: 1.7; }
 .faq__item p a { color: var(--lilac-300); text-decoration: underline; }
-
-@media (min-width: 768px) {
-  .contact-head { padding-block: var(--s-8); }
-  .contact-card { padding: var(--s-6); }
-  .find-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
 
 /* ---------- Beranda motion (main.js) ---------- */
 /* gamesir.com's reveal: from one of three starts into place, 850ms on its ease. The individual
@@ -4146,7 +3843,6 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
 @keyframes chat-in { from { opacity: 0; scale: .4; } }
 @media (prefers-reduced-motion: reduce) { .chat-bubble { animation: none; } }
 
-
 /* ---------- Accounts: Masuk, Daftar, Akun ---------- */
 /* The top of each page's first block sits where checkout's headline does (see .paid). */
 .auth, .acc { padding-block: calc(var(--s-3) + var(--s-4)) var(--s-8); }
@@ -4262,8 +3958,8 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
 }
 .auth-form { display: grid; gap: var(--s-4); margin-top: var(--s-5); }
 /* the floating labels cut the border against the card's ink-900 */
-.auth-form .pdp-input, .acc-form .pdp-input, .sensi-code .pdp-input { height: 48px; }
-.auth-form .pdp-hint, .acc-form .pdp-hint, .sensi-code .pdp-hint { margin-top: 6px; }
+.auth-form .pdp-input { height: 48px; }
+.auth-form .pdp-hint { margin-top: 6px; }
 /* Masuk and Daftar have no label above the box, so the field's gap only sits over the hint;
    halved, so the hint reads as part of its field (10px in all, from 14px). */
 .auth-form .pdp-field { gap: var(--s-1); }
@@ -4601,33 +4297,6 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
 .acc-track__rows dd { margin: 0; color: var(--text-soft); line-height: 1.5; }
 .acc-track__rows .is-pending { color: var(--faint); font-style: italic; }
 
-/* Sensi Saya */
-.acc-scan {
-  position: relative; display: flex; align-items: center; gap: var(--s-3); padding: var(--s-4);
-  background: linear-gradient(120deg, rgba(106, 46, 158, .35), rgba(179, 58, 198, .2)), var(--ink-900);
-  border: 1px solid var(--line-strong);
-  transition: border-color var(--t-fast) ease-out;
-}
-.acc-scan:hover { border-color: #8E48C4; }
-.acc-scan__icon { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--line-from), var(--line-to)); color: #fff; }
-.acc-scan__text { flex: 1; min-width: 0; display: grid; gap: 2px; font-size: var(--fs-xs); color: var(--mute); }
-.acc-scan__text strong { font-size: var(--fs-body); color: var(--text); }
-.acc-scan__chev { flex: none; color: var(--mute); }
-.sensi-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); margin-top: var(--s-4); }
-@media (min-width: 600px) { .sensi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); } }
-@media (min-width: 1024px) { .sensi-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-.sensi-tile { display: grid; gap: 2px; width: 100%; text-align: left; }
-.sensi-tile__art { display: block; aspect-ratio: 3 / 4; overflow: hidden; margin-bottom: var(--s-2); border: 1px solid var(--line); background: var(--ink-800); transition: border-color var(--t-fast) ease-out; }
-.sensi-tile__art img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; transition: transform 400ms var(--ease); }
-.sensi-tile__name { font-size: var(--fs-sm); font-weight: 700; }
-.sensi-tile__date { font-size: var(--fs-xs); color: var(--mute); }
-.sensi-tile:focus-visible { outline: none; }
-.sensi-tile:focus-visible .sensi-tile__art { outline: 2px solid var(--violet-400); outline-offset: 2px; }
-@media (hover: hover) {
-  .sensi-tile:hover .sensi-tile__art { border-color: #8E48C4; }
-  .sensi-tile:hover .sensi-tile__art img { transform: scale(1.04); }
-}
-
 /* Profil */
 /* Pengaturan: Profil, Alamat Pengiriman and Keamanan, each a chamfered card with an icon
    title; the address and password sit in rows that fold their form open under them. */
@@ -4719,11 +4388,7 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
 .acc-out:hover { background: rgba(255, 138, 158, .2); color: var(--err-hover); }
 @media (max-width: 899px) { .acc-out { display: inline-flex; } }
 
-.acc-form { position: relative; display: grid; gap: var(--s-4); max-width: 520px; padding: var(--s-5); background: var(--ink-900); border: 1px solid var(--line); }
-.acc-form input[readonly] { color: var(--mute); border-style: dashed; }
-.acc-form input[readonly]:hover { border-color: var(--line-strong); }
 .acc-form__foot { display: flex; align-items: center; gap: var(--s-4); }
-.acc-form__title { font-size: 1.0625rem; font-weight: 700; }
 .acc-form__status { display: inline-flex; align-items: center; gap: var(--s-1); font-size: var(--fs-sm); font-weight: 600; color: var(--lilac-300); }
 .acc-form__status[hidden] { display: none; }
 
@@ -4839,7 +4504,6 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
 .scan-sheet__cta:has(input:focus-visible) { outline: 2px solid var(--violet-400); outline-offset: 2px; }
 .scan-sheet__tool:focus-visible { outline: 2px solid var(--violet-400); outline-offset: 2px; }
 
-
 /* The viewfinder: square, the camera feed filling it, a frame with corner brackets in the
    middle and a laser sweeping it while live. Idle, it says what the button below does. */
 .sensi-scan__view {
@@ -4913,86 +4577,6 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
 .sensi-scan__actions [hidden] { display: none; }
 .sensi-scan__upload { cursor: pointer; }
 .sensi-scan__upload:has(input:focus-visible) { outline: 2px solid var(--violet-400); outline-offset: 2px; }
-.sensi-code { max-width: 520px; margin-top: var(--s-5); }
-.sensi-code__or { display: flex; align-items: center; gap: var(--s-3); font-size: var(--fs-xs); color: var(--faint); }
-.sensi-code__or::before, .sensi-code__or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-.sensi-code__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--s-2); margin-top: var(--s-4); }
-.sensi-code .co-float__label { background: var(--ink-950); }
-.sensi-code .co-float:has(.pdp-input:focus, .pdp-input:not(:placeholder-shown), .pdp-input:autofill) .co-float__label { background: var(--ink-950); }
-.sensi-code .pdp-input { text-transform: uppercase; letter-spacing: .06em; font-variant-numeric: tabular-nums; }
-
-.sensi-how { position: relative; padding: var(--s-5); background: var(--ink-900); border: 1px solid var(--line); }
-.sensi-how__title { font-size: 1.125rem; font-weight: 800; }
-.sensi-steps { display: grid; gap: var(--s-4); margin-top: var(--s-4); }
-.sensi-steps li { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: var(--s-3); }
-.sensi-steps__n {
-  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--line-from), var(--line-to)); color: #fff; font-weight: 800; font-size: var(--fs-sm);
-}
-.sensi-steps strong { display: block; font-size: var(--fs-sm); line-height: 32px; }
-.sensi-steps p { font-size: var(--fs-xs); line-height: 1.5; color: var(--mute); }
-.sensi-how__roster-title { margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--line); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--lilac-300); }
-.sensi-roster { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); margin-top: var(--s-3); }
-.sensi-roster__p { display: grid; justify-items: center; gap: 4px; min-width: 0; }
-.sensi-roster__art { display: block; width: min(100%, 80px); aspect-ratio: 1; overflow: hidden; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--ink-800); }
-.sensi-roster__art img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 34%; transform: scale(1.9); transform-origin: 50% 36%; }
-.sensi-roster__name { max-width: 100%; font-size: var(--fs-2xs); font-weight: 600; color: var(--text-soft); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (min-width: 600px) and (max-width: 899px) { .sensi-roster { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
-
-/* The card a pack opens: the portrait on top on a phone, beside the settings from 600px. A new
-   one flips in out of the light; from Sensi Saya it just fades up. */
-.sensi-dialog {
-  width: min(100% - 2 * var(--s-4), 760px); max-height: calc(calc(100 * var(--dvh)) - 2 * var(--s-4));
-  margin: auto; padding: 0; border: 0; background: none; color: var(--text); overflow: visible;
-}
-.sensi-dialog::backdrop { background: rgba(6, 1, 9, .78); backdrop-filter: blur(6px); }
-.sensi-card {
-  position: relative; display: grid; max-height: calc(calc(100 * var(--dvh)) - 2 * var(--s-4)); overflow-y: auto; overscroll-behavior: contain;
-  background: var(--ink-900); border: 1px solid var(--line-strong);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, .6), 0 0 60px -10px rgba(179, 58, 198, .45);
-  animation: sensi-up 260ms var(--ease-out) both;
-}
-.sensi-card.is-fresh { animation: sensi-flip 700ms cubic-bezier(.2, .9, .25, 1.15) both; }
-@keyframes sensi-up { from { opacity: 0; translate: 0 16px; } }
-@keyframes sensi-flip {
-  0% { opacity: 0; transform: perspective(1200px) rotateY(-80deg) scale(.86); filter: brightness(2.2); }
-  60% { opacity: 1; filter: brightness(1.3); }
-  100% { transform: none; filter: none; }
-}
-@media (prefers-reduced-motion: reduce) { .sensi-card, .sensi-card.is-fresh { animation: none; } }
-.sensi-card__close { position: absolute; top: var(--s-2); right: var(--s-2); z-index: 2; background: rgba(12, 3, 16, .6); }
-.sensi-card__close:hover { background: var(--ink-800); }
-.sensi-card__art { position: relative; margin: 0; aspect-ratio: 4 / 3; overflow: hidden; background: var(--ink-800); }
-.sensi-card__art img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 32%; }
-/* a sweep of light across the portrait as a new card lands */
-.sensi-card.is-fresh .sensi-card__art::after {
-  content: ""; position: absolute; inset: 0;
-  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .45) 50%, transparent 65%);
-  transform: translateX(-100%); animation: sensi-shine 900ms 450ms ease-out forwards;
-}
-@keyframes sensi-shine { to { transform: translateX(100%); } }
-@media (prefers-reduced-motion: reduce) { .sensi-card.is-fresh .sensi-card__art::after { content: none; } }
-.sensi-card__body { padding: var(--s-5); }
-@media (min-width: 600px) {
-  .sensi-card { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
-  .sensi-card__art { aspect-ratio: auto; min-height: 100%; }
-  .sensi-card__art img { position: absolute; inset: 0; object-position: 50% 30%; }
-  .sensi-card__body { padding: var(--s-6) var(--s-6) var(--s-5); }
-}
-.sensi-card__eyebrow { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--lilac-300); }
-.sensi-card__name { margin-top: var(--s-2); font-size: clamp(1.5rem, 1.2rem + calc(1.2 * var(--vw)), 2rem); font-weight: 800; line-height: 1.15; }
-.sensi-card__role { margin-top: var(--s-1); font-size: var(--fs-sm); color: var(--mute); }
-.sensi-card__rows { display: grid; margin: var(--s-4) 0 0; border-top: 1px solid var(--line); }
-.sensi-card__rows div { display: flex; justify-content: space-between; gap: var(--s-4); padding: 10px 0; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
-.sensi-card__rows dt { color: var(--mute); }
-.sensi-card__rows dd { margin: 0; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
-.sensi-card__rows dd.is-pending { font-weight: 500; font-style: italic; color: var(--faint); }
-.sensi-card__code { margin-top: var(--s-3); font-size: var(--fs-2xs); color: var(--faint); letter-spacing: .04em; font-variant-numeric: tabular-nums; }
-.sensi-card__actions { margin-top: var(--s-4); }
-.sensi-card__saved { display: flex; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-3); font-size: var(--fs-xs); font-weight: 600; color: var(--lilac-300); text-align: center; }
-a.sensi-card__saved:hover { color: var(--text); }
-.sensi-card__saved.is-guest { font-weight: 500; color: var(--mute); }
-.sensi-card__saved .icon { flex: none; width: 15px; height: 15px; }
 
 /* Cut corners: the cards lose their top-left and bottom-right corners to a 45° chamfer, the
    esports-card look. clip-path does the cut, but it also cuts the border away along the
@@ -5004,29 +4588,74 @@ a.sensi-card__saved:hover { color: var(--text); }
    box (the diagonals stay put), so a card whose height lands on a fractional pixel doesn't
    lose its bottom border to the clip edge. */
 :root { --cut: 14px; }
-.product-card, .more-card, .catalog-bar, .shop-banner__card, .gallery__stage, .pdp-buy,
-.spec-table, .rating-summary, .cmp__media, .showcase, .video, .clip__link, .tech-card, .review,
-.cart-panel, .cart-summary, .co-card, .co-methods, .co-promo, .co-summary, .about-value,
-.contact-card, .find-card, .contact-info, .contact-form-card, .contact-faq-link,
-.auth-card, .acc-order, .acc-scan, .acc-form, .sensi-how, .sensi-card, .cat-card,
-.acc-stats, .acc-recent, .acc-empty, .acc-set, .acc-side {
+.product-card,
+.more-card,
+.catalog-bar,
+.shop-banner__card,
+.gallery__stage,
+.pdp-buy,
+.spec-table,
+.rating-summary,
+.cmp__media,
+.showcase,
+.video,
+.clip__link,
+.tech-card,
+.review,
+.cart-panel,
+.cart-summary,
+.co-card,
+.co-methods,
+.co-promo,
+.co-summary,
+.find-card,
+.contact-info,
+.contact-form-card,
+.contact-faq-link,
+.auth-card,
+.acc-order,
+.cat-card,
+.acc-stats,
+.acc-recent,
+.acc-empty,
+.acc-set,
+.acc-side {
   --cut-line: var(--line);
   clip-path: polygon(calc(var(--cut) + 2px) -2px, calc(100% + 2px) -2px,
     calc(100% + 2px) calc(100% - var(--cut) - 2px), calc(100% - var(--cut) - 2px) calc(100% + 2px),
     -2px calc(100% + 2px), -2px calc(var(--cut) + 2px));
 }
-:where(.more-card, .pdp-buy, .spec-table, .cmp__media, .showcase, .review, .cart-panel,
-  .cart-summary, .co-card, .co-methods, .co-promo, .co-summary, .about-value, .contact-card,
-  .contact-info, .contact-form-card, .contact-faq-link) { position: relative; }
-.product-card::before, .more-card::before, .catalog-bar::before, .shop-banner__card::before,
-.gallery__stage::before, .pdp-buy::before, .spec-table::before, .rating-summary::after,
-.cmp__media::before, .video::before, .clip__link::before, .tech-card::before, .review::before,
-.cart-panel::before, .cart-summary::before, .co-card::before, .co-methods::before,
-.co-promo::before, .co-summary::before, .about-value::before, .contact-card::before,
-.find-card::before, .contact-info::before, .contact-form-card::before,
-.contact-faq-link::before, .auth-card::before, .acc-order::before, .acc-scan::before,
-.acc-form::before, .sensi-how::before, .sensi-card::before, .cat-card::before,
-.acc-stats::before, .acc-recent::before, .acc-empty::before, .acc-set::before, .acc-side::before {
+.product-card::before,
+.more-card::before,
+.catalog-bar::before,
+.shop-banner__card::before,
+.gallery__stage::before,
+.pdp-buy::before,
+.spec-table::before,
+.rating-summary::after,
+.cmp__media::before,
+.video::before,
+.clip__link::before,
+.tech-card::before,
+.review::before,
+.cart-panel::before,
+.cart-summary::before,
+.co-card::before,
+.co-methods::before,
+.co-promo::before,
+.co-summary::before,
+.find-card::before,
+.contact-info::before,
+.contact-form-card::before,
+.contact-faq-link::before,
+.auth-card::before,
+.acc-order::before,
+.cat-card::before,
+.acc-stats::before,
+.acc-recent::before,
+.acc-empty::before,
+.acc-set::before,
+.acc-side::before {
   content: ""; position: absolute; inset: -1px; z-index: 3; pointer-events: none;
   background:
     linear-gradient(to bottom right, transparent 50%, var(--cut-line) 50% calc(50% + 1.5px), transparent calc(50% + 1.5px))
@@ -5034,7 +4663,7 @@ a.sensi-card__saved:hover { color: var(--text); }
     linear-gradient(to top left, transparent 50%, var(--cut-line) 50% calc(50% + 1.5px), transparent calc(50% + 1.5px))
       bottom right / var(--cut) var(--cut) no-repeat;
 }
-.more-card, .contact-faq-link, .acc-scan, .sensi-card, .cat-card { --cut-line: var(--line-strong); }
+.more-card, .contact-faq-link, .cat-card { --cut-line: var(--line-strong); }
 /* The catalog bar holds the Filter menu, which drops past the bar's bottom edge, so the bar
    itself can't be clipped. Its fill and border move to a clipped layer underneath instead (the
    same polygon, on a box the size of the bar's border box), and the bar stays unclipped. */
@@ -5071,7 +4700,6 @@ a.sensi-card__saved:hover { color: var(--text); }
     linear-gradient(to bottom right, var(--d)) top left / var(--cut) var(--cut) no-repeat,
     linear-gradient(to top left, var(--d)) bottom right / var(--cut) var(--cut) no-repeat;
 }
-.acc-scan:hover { --cut-line: #8E48C4; }
 .rating-summary { --cut-line: var(--violet-500); }
 .find-card:hover, .contact-faq-link:hover { --cut-line: #8E48C4; }
 a.cmp__media:hover { --cut-line: #584066; }
@@ -5092,28 +4720,21 @@ a.cmp__media:hover { --cut-line: #584066; }
    overlay kept alive for the length of the transition (allow-discrete); browsers without that
    just close at once. The search panel drops from above instead, as it hangs off the top. The
    Sensi card animates its own entrance inside the dialog, so its dialog only fades. */
-.search-dialog, .co-dialog, .review-zoom, .sensi-dialog {
+.search-dialog, .co-dialog, .review-zoom {
   --pop-y: 12px; --pop-scale: .97;
   opacity: 0; translate: 0 var(--pop-y); scale: var(--pop-scale);
   transition: opacity 220ms var(--ease), translate 260ms var(--ease), scale 260ms var(--ease),
               overlay 260ms allow-discrete, display 260ms allow-discrete;
 }
 .search-dialog { --pop-y: -12px; --pop-scale: 1; }
-.sensi-dialog { --pop-y: 0px; --pop-scale: 1; }
-:is(.search-dialog, .co-dialog, .review-zoom, .sensi-dialog)[open] { opacity: 1; translate: 0 0; scale: 1; }
 @starting-style {
-  :is(.search-dialog, .co-dialog, .review-zoom, .sensi-dialog)[open] { opacity: 0; translate: 0 var(--pop-y); scale: var(--pop-scale); }
+  :is(.search-dialog, .co-dialog, .review-zoom)[open] { opacity: 0; translate: 0 var(--pop-y); scale: var(--pop-scale); }
 }
-:is(.search-dialog, .co-dialog, .review-zoom, .sensi-dialog)::backdrop {
-  opacity: 0;
-  transition: opacity 220ms var(--ease), overlay 260ms allow-discrete, display 260ms allow-discrete;
-}
-:is(.search-dialog, .co-dialog, .review-zoom, .sensi-dialog)[open]::backdrop { opacity: 1; }
 @starting-style {
-  :is(.search-dialog, .co-dialog, .review-zoom, .sensi-dialog)[open]::backdrop { opacity: 0; }
+  :is(.search-dialog, .co-dialog, .review-zoom)[open]::backdrop { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .search-dialog, .co-dialog, .review-zoom, .sensi-dialog { --pop-y: 0px; --pop-scale: 1; }
+  .search-dialog, .co-dialog, .review-zoom { --pop-y: 0px; --pop-scale: 1; }
 }
 
 /* ---------- Masuk, Daftar, Akun and Scan QR in Tungsten ---------- */
@@ -5151,5 +4772,3 @@ a.cmp__media:hover { --cut-line: #584066; }
    on one line. Draco's sizes were set for a face drawn squeezed to 63%, so Tungsten read small. */
 .font-preview .home .section-head .section-title { font-size: clamp(3.125rem, calc(9.2 * var(--cqi)), 7rem); line-height: 1; }
 @media (max-width: 599px) { .font-preview .home .section-head .section-title { font-size: calc(13.4 * var(--cqi)); } }
-.font-preview .home .section-head .section-title--sub { font-size: clamp(1.75rem, calc(9.2 * var(--vw)) - 4.4px, 3.25rem); }
-@media (min-width: 1024px) { .font-preview .home .section-head .section-title--sub { font-size: clamp(3.25rem, 1.9rem + calc(2.85 * var(--vw)), 4rem); } }
