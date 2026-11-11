@@ -1,11 +1,14 @@
-name = "nexura"
+# This file describes the STAGING site: a practice copy with its own database, where payments
+# can be simulated. The real shop will be a separate environment added below when it launches,
+# and it will not have the two [vars] lines.
+name = "nexura-staging"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
 
-# The site's pages are copied into ./site before each deploy (scripts/build-site.mjs leaves out
-# everything that is not public); anything under /api/ goes to the Worker.
+# Before each deploy scripts/build.mjs copies the public pages into ./site and bundles the
+# database schema with the Worker; anything under /api/ goes to the Worker.
 [build]
-command = "node scripts/build-site.mjs"
+command = "node scripts/build.mjs"
 
 [assets]
 directory = "./site"
@@ -15,8 +18,12 @@ run_worker_first = ["/api/*"]
 [triggers]
 crons = ["*/5 * * * *"]
 
+[vars]
+ENVIRONMENT = "staging"
+DEMO_PAYMENTS = "yes"   # the "Simulasi bayar" button; the Worker also checks the address
+
 # database_id is filled in once the database exists in the Cloudflare account.
 [[d1_databases]]
 binding = "DB"
-database_name = "nexura"
+database_name = "nexura-staging"
 database_id = "00000000-0000-0000-0000-000000000000"

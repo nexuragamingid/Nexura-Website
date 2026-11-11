@@ -8,6 +8,8 @@
  *   - Anything guessable (passwords, codes) sits behind an attempt limit.
  */
 
+import { VERSION, SCHEMA, SEED } from './generated.js';
+
 const SESSION_COOKIE = 'nx_session';
 const GUEST_COOKIE = 'nx_guest';
 const SESSION_DAYS = 30;
@@ -20,6 +22,25 @@ const MAX_QTY = 99;
 const MAX_LINES = 30;
 const MAX_ADDRESSES = 10;
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/* ------------------------------ database set-up ------------------------------ */
+
+/* The Worker keeps its own database in step with the code it was built from: the tables
+   (CREATE ... IF NOT EXISTS) and the catalogue (prices, couriers; stock counts are never
+   overwritten). Checked once per start-up with one small read, applied only when the build's
+   version differs from the one the database last recorded. */
+let readyFor = null;
+async function ready(db) {
+  if (readyFor === VERSION) return;
+  let have = null;
+  try { have = (await db.prepare("SELECT value FROM settings WHERE key = 'schema_version'").first())?.value; } catch { /* first run: no tables yet */ }
+  if (have !== JSON.stringify(VERSION)) {
+    const steps = [...SCHEMA, ...SEED].map((q) => db.prepare(q));
+    for (let i = 0; i < steps.length; i += 40) await db.batch(steps.slice(i, i + 40));
+    await db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('schema_version', ?)").bind(JSON.stringify(VERSION)).run();
+  }
+  readyFor = VERSION;
+}
 
 /* ------------------------------ small helpers ------------------------------ */
 
@@ -480,10 +501,13 @@ async function markPaid(db, id, ref) {
   return res.meta.changes === 1;
 }
 
-/* Practice payments, for clicking the flow through before the gateway is connected. Two locks,
-   both needed: a setting that exists only in a developer's local file (never in the Cloudflare
-   account), and the address being this computer's own. On the real site this answers 404. */
-const demoPayments = (ctx) => ctx.env.DEMO_PAYMENTS === 'yes' && ['localhost', '127.0.0.1'].includes(ctx.url.hostname);
+/* Practice payments, for clicking the flow through before the gateway is connected. They need
+   the DEMO_PAYMENTS setting AND an address that is not the shop's: a developer's own computer,
+   or the staging copy on its workers.dev address (which must also call itself staging). The
+   real shop has neither setting and lives on its own domain, so there this answers 404. */
+const demoPayments = (ctx) => ctx.env.DEMO_PAYMENTS === 'yes' && (
+  ['localhost', '127.0.0.1'].includes(ctx.url.hostname)
+  || (ctx.env.ENVIRONMENT === 'staging' && ctx.url.hostname.endsWith('.workers.dev')));
 async function demoPay(ctx) {
   if (!demoPayments(ctx)) throw new HttpError(404, 'not_found');
   const body = await readBody(ctx.request);
@@ -649,6 +673,7 @@ export default {
     const ctx = { request, env, url, db: env.DB, setCookies: [], ip: request.headers.get('CF-Connecting-IP') || 'local' };
     try {
       if (!url.pathname.startsWith('/api/')) throw new HttpError(404, 'not_found');
+      await ready(env.DB);
       // A request that changes something must come from our own pages, not from another site.
       if (request.method !== 'GET' && !url.pathname.startsWith('/api/payments/duitku/')) {
         const origin = request.headers.get('Origin');
@@ -669,6 +694,7 @@ export default {
 
   // Every few minutes: return the stock of unpaid orders, forget finished sessions and old attempt records.
   async scheduled(event, env) {
+    await ready(env.DB);
     await releaseExpired(env.DB);
     await env.DB.batch([
       env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(Date.now()),

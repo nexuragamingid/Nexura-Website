@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process';
 
 const [BASE = 'http://localhost:8787', CODE_A, CODE_B, SHARED] = process.argv.slice(2);
 // Stands in for things only the owner or the payment gateway can do: a direct change in the database.
-const sql = (command) => execSync(`npx wrangler d1 execute nexura --local --command "${command}"`, { cwd: new URL('..', import.meta.url), stdio: 'pipe', env: { ...process.env, CI: '1' } });
+const sql = (command) => execSync(`npx wrangler d1 execute nexura-staging --local --command "${command}"`, { cwd: new URL('..', import.meta.url), stdio: 'pipe', env: { ...process.env, CI: '1' } });
 let failed = 0;
 let passed = 0;
 function check(name, ok, detail = '') {

@@ -1,6 +1,8 @@
-// Writes seed SQL for the catalogue from the site's own assets/js/data.js, so the server
-// prices orders from the same figures the pages show.   node scripts/seed.mjs > out/seed.sql
+// Seed SQL for the catalogue, made from the site's own assets/js/data.js, so the server prices
+// orders from the same figures the pages show. Used by scripts/build.mjs (the Worker applies it
+// itself); run directly to read it:   node scripts/seed.mjs
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const src = readFileSync(new URL('../../assets/js/data.js', import.meta.url), 'utf8');
@@ -30,4 +32,5 @@ out.push(row('settings', ['key', 'value'], ['qrisMinutes', JSON.stringify(checko
 out.push(row('settings', ['key', 'value'], ['payments', JSON.stringify(checkout.payments.map((p) => p.id))]));
 for (const p of sensi.players) out.push(row('sensi_players', ['id', 'name', 'role', 'image', 'settings'], [p.id, p.name, p.role, p.image, JSON.stringify(p.settings)]));
 
-console.log(out.join('\n'));
+export const seedStatements = out.map((q) => q.replace(/;\s*$/, ''));
+if (process.argv[1] === fileURLToPath(import.meta.url)) console.log(out.join('\n'));

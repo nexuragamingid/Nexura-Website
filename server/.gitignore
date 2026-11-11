@@ -6,3 +6,4 @@ node_modules/
 out/
 # Built copy of the pages (scripts/build-site.mjs)
 site/
+src/generated.js

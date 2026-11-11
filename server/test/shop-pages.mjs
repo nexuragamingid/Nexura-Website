@@ -5,7 +5,7 @@ import { execSync } from 'node:child_process';
 const [BASE, OUT] = process.argv.slice(2);
 let failed = 0;
 const check = (name, ok, detail = '') => { if (!ok) failed += 1; console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${name} ${ok ? '' : detail}`); };
-const sql = (c) => execSync(`npx wrangler d1 execute nexura --local --command "${c}"`, { cwd: new URL('..', import.meta.url), stdio: 'pipe', env: { ...process.env, CI: '1' } });
+const sql = (c) => execSync(`npx wrangler d1 execute nexura-staging --local --command "${c}"`, { cwd: new URL('..', import.meta.url), stdio: 'pipe', env: { ...process.env, CI: '1' } });
 const mail = `dimas.${Date.now()}@example.com`;
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--no-proxy-server'] });
 const errors = [];

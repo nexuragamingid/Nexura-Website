@@ -21,19 +21,18 @@ trap stop_server EXIT
 
 stop_server
 rm -rf .wrangler out && mkdir -p out
-node scripts/build-site.mjs > /dev/null
-node scripts/seed.mjs > out/seed.sql
 SENSI_PEPPER=$PEPPER node scripts/gen-codes.mjs test01 jeje 5 > /dev/null
 SENSI_PEPPER=$PEPPER node scripts/shared-code.mjs NEXURA-SENSI-2026 "Kemasan 2026" > out/shared.sql
-for f in schema.sql out/seed.sql out/test01-jeje.sql out/shared.sql; do npx wrangler d1 execute nexura --local --file "$f" > /dev/null; done
 
-start_server
+# The database starts empty: the server builds its own tables and catalogue on the first request.
+start_server 'DEMO_PAYMENTS="no"'
+for f in out/test01-jeje.sql out/shared.sql; do npx wrangler d1 execute nexura-staging --local --file "$f" > /dev/null; done
 node test/api.test.mjs "$BASE" "$(sed -n 2p out/test01-jeje.csv)" "$(sed -n 3p out/test01-jeje.csv)" NEXURA-SENSI-2026
 
 if [ "${1:-}" = "pages" ]; then
   # Practice payments on, as on a developer's computer, so the flow can be paid through.
   start_server 'DEMO_PAYMENTS="yes"'
-  npx wrangler d1 execute nexura --local --command "DELETE FROM rate_events" > /dev/null
+  npx wrangler d1 execute nexura-staging --local --command "DELETE FROM rate_events" > /dev/null
   node test/account-pages.mjs "$BASE" "$2"
   node test/shop-pages.mjs "$BASE" "$2"
   node test/shots.mjs "$BASE" "$2"

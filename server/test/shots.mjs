@@ -2,7 +2,7 @@
 import puppeteer from 'puppeteer-core';
 import { execSync } from 'node:child_process';
 const [BASE, OUT] = process.argv.slice(2);
-const sql = (c) => execSync(`npx wrangler d1 execute nexura --local --command "${c}"`, { cwd: new URL('..', import.meta.url), stdio: 'pipe', env: { ...process.env, CI: '1' } });
+const sql = (c) => execSync(`npx wrangler d1 execute nexura-staging --local --command "${c}"`, { cwd: new URL('..', import.meta.url), stdio: 'pipe', env: { ...process.env, CI: '1' } });
 const post = (path, body, cookie) => fetch(BASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) });
 const addr = { name: 'Rina <script>alert(1)</script>', phone: '081234567890', street: 'Jl. Kemang Raya No. 12 <img src=x onerror=alert(2)>', city: 'Jakarta Selatan', postal: '12730' };
 await post('/api/auth/signup', { name: 'Admin Nexura', email: 'admin@example.com', phone: '081200000000', password: 'admin-lokal-123' });
