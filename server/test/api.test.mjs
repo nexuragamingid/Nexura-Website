@@ -149,10 +149,10 @@ if (CODE_A && CODE_B) {
   r = await guest2('POST', '/api/sensi/claim', { code: SHARED });
   check('the shared pack QR needs an account', r.status === 401 && r.data.error === 'sign_in_required', JSON.stringify(r.data));
   r = await budi('POST', '/api/sensi/claim', { code: SHARED.toLowerCase() });
-  check('...and opens every player for a signed-in user', r.status === 200 && r.data.sensi.length === 6, JSON.stringify(r.data).slice(0, 200));
+  check('...and opens every player for a signed-in user', r.status === 200 && r.data.sensi.length === 1, JSON.stringify(r.data).slice(0, 200));
   await budi('POST', '/api/sensi/claim', { code: SHARED });
   r = await budi('GET', '/api/sensi');
-  check('...once each, however often it is scanned', r.data.sensi.length === 6, String(r.data.sensi.length));
+  check('...once each, however often it is scanned', r.data.sensi.length === 1, String(r.data.sensi.length));
   let last;
   for (let i = 0; i < 12; i += 1) last = await stranger('POST', '/api/sensi/claim', { code: `NX-AAAA-AA${String(i).padStart(2, '0')}` });
   check('guessing codes gets cut off', last.status === 429, String(last.status));

@@ -26,6 +26,7 @@ SENSI_PEPPER=$PEPPER node scripts/shared-code.mjs NEXURA-SENSI-2026 "Kemasan 202
 
 # The database starts empty: the server builds its own tables and catalogue on the first request.
 start_server 'DEMO_PAYMENTS="no"'
+npx wrangler d1 execute nexura-staging --local --command "INSERT OR IGNORE INTO sensi_players (id, name, role, image, settings) VALUES ('jeje', 'Pemain Uji', 'Tes', 'x', '[]')" > /dev/null
 for f in out/test01-jeje.sql out/shared.sql; do npx wrangler d1 execute nexura-staging --local --file "$f" > /dev/null; done
 node test/api.test.mjs "$BASE" "$(sed -n 2p out/test01-jeje.csv)" "$(sed -n 3p out/test01-jeje.csv)" NEXURA-SENSI-2026
 

@@ -30,7 +30,8 @@ for (const [code, p] of Object.entries(checkout.promos)) out.push(row('promos', 
 out.push(row('settings', ['key', 'value'], ['insurance', JSON.stringify(checkout.insurance)]));
 out.push(row('settings', ['key', 'value'], ['qrisMinutes', JSON.stringify(checkout.qrisMinutes)]));
 out.push(row('settings', ['key', 'value'], ['payments', JSON.stringify(checkout.payments.map((p) => p.id))]));
-for (const p of sensi.players) out.push(row('sensi_players', ['id', 'name', 'role', 'image', 'settings'], [p.id, p.name, p.role, p.image, JSON.stringify(p.settings)]));
+// The site no longer carries sensi data (the pack QR opens a Drive link); kept for a future pack with its own code.
+for (const p of sensi?.players || []) out.push(row('sensi_players', ['id', 'name', 'role', 'image', 'settings'], [p.id, p.name, p.role, p.image, JSON.stringify(p.settings)]));
 
 export const seedStatements = out.map((q) => q.replace(/;\s*$/, ''));
 if (process.argv[1] === fileURLToPath(import.meta.url)) console.log(out.join('\n'));
