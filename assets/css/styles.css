@@ -3442,6 +3442,26 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
   background: var(--ink-800); border: 1px solid var(--line-strong); color: var(--lilac-300);
 }
 .scan-note__icon .icon { width: 28px; height: 28px; }
+
+/* Tambah Keranjang on a computer: the address dialog's frame, the item that went in, and the
+   way on to the cart */
+.cart-added { width: min(100% - 2 * var(--s-4), 460px); }
+.cart-added .co-dialog__head .icon-btn { flex: none; }
+.cart-added__title { display: flex; align-items: center; gap: var(--s-2); }
+.cart-added__ok {
+  flex: none; width: 22px; height: 22px; padding: 4px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--line-from), var(--line-to)); color: #fff;
+}
+.cart-added__item { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-5); }
+.cart-added__thumb {
+  flex: none; width: 72px; height: 72px; object-fit: cover;
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--ink-950);
+}
+.cart-added__info { min-width: 0; display: grid; gap: 2px; }
+.cart-added__name { font-weight: 700; line-height: 1.35; }
+.cart-added__meta { font-size: var(--fs-xs); color: var(--mute); }
+.cart-added__price { margin-top: var(--s-1); font-size: var(--fs-sm); color: var(--mute); }
+.cart-added__price strong { color: var(--text); }
 .co-dialog__head:has([data-co-map-back]:not([hidden])) { padding-left: var(--s-3); }
 
 /* Map pin, top of the address form, for an address saved with one: the picked address with Ubah,
@@ -4625,6 +4645,9 @@ body:has([data-pay-dock]) { padding-bottom: var(--dock-h, 0px); }
     calc(100% + 2px) calc(100% - var(--cut) - 2px), calc(100% - var(--cut) - 2px) calc(100% + 2px),
     -2px calc(100% + 2px), -2px calc(var(--cut) + 2px));
 }
+:where(.more-card, .pdp-buy, .spec-table, .cmp__media, .showcase, .review, .cart-panel,
+  .cart-summary, .co-card, .co-methods, .co-promo, .co-summary, .contact-info,
+  .contact-form-card, .contact-faq-link) { position: relative; }
 .product-card::before,
 .more-card::before,
 .catalog-bar::before,
@@ -4718,8 +4741,7 @@ a.cmp__media:hover { --cut-line: #584066; }
 /* Every pop-up eases in and back out: the box rises 12px into place from 97% and fades, the
    dimmed backdrop fades with it. Closing plays the same in reverse, which needs display and
    overlay kept alive for the length of the transition (allow-discrete); browsers without that
-   just close at once. The search panel drops from above instead, as it hangs off the top. The
-   Sensi card animates its own entrance inside the dialog, so its dialog only fades. */
+   just close at once. The search panel drops from above instead, as it hangs off the top. */
 .search-dialog, .co-dialog, .review-zoom {
   --pop-y: 12px; --pop-scale: .97;
   opacity: 0; translate: 0 var(--pop-y); scale: var(--pop-scale);
@@ -4727,9 +4749,15 @@ a.cmp__media:hover { --cut-line: #584066; }
               overlay 260ms allow-discrete, display 260ms allow-discrete;
 }
 .search-dialog { --pop-y: -12px; --pop-scale: 1; }
+:is(.search-dialog, .co-dialog, .review-zoom)[open] { opacity: 1; translate: 0 0; scale: 1; }
 @starting-style {
   :is(.search-dialog, .co-dialog, .review-zoom)[open] { opacity: 0; translate: 0 var(--pop-y); scale: var(--pop-scale); }
 }
+:is(.search-dialog, .co-dialog, .review-zoom)::backdrop {
+  opacity: 0;
+  transition: opacity 220ms var(--ease), overlay 260ms allow-discrete, display 260ms allow-discrete;
+}
+:is(.search-dialog, .co-dialog, .review-zoom)[open]::backdrop { opacity: 1; }
 @starting-style {
   :is(.search-dialog, .co-dialog, .review-zoom)[open]::backdrop { opacity: 0; }
 }

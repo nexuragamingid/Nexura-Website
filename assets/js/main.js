@@ -2350,7 +2350,46 @@
       if (then) { location.href = then; return; }
       // from the sheet, focus comes back to the dock button that opened it
       if (sheetOpen()) hideDrawer(buyBox);
+      if (computer.matches) showAdded(state.color, state.qty, phone);
     };
+
+    /* On a computer, Tambah Keranjang confirms in a pop-up: what went in, and the way on to
+       the cart. Phones keep the badge bump alone, as the sheet they add from has just closed. */
+    const computer = window.matchMedia('(hover: hover) and (pointer: fine)');
+    let added = null;
+    function showAdded(colorId, qty, phone) {
+      if (!added) {
+        added = document.createElement('dialog');
+        added.className = 'co-dialog cart-added';
+        added.setAttribute('aria-labelledby', 'cart-added-title');
+        added.innerHTML = `
+          <div class="co-dialog__head">
+            <h2 class="co-dialog__title cart-added__title" id="cart-added-title">${icon('check', 'icon cart-added__ok')}Berhasil masuk keranjang</h2>
+            <button class="icon-btn" type="button" aria-label="Tutup" data-added-close>${icon('x')}</button>
+          </div>
+          <div class="cart-added__item" data-added-item></div>
+          <div class="co-dialog__foot">
+            <button class="btn btn--secondary" type="button" data-added-close>Lanjut Belanja</button>
+            <a class="btn btn--primary" href="${SITE}keranjang/">Lihat Keranjang</a>
+          </div>`;
+        document.body.appendChild(added);
+        added.addEventListener('click', (e) => {
+          if (e.target === added || e.target.closest('[data-added-close]')) added.close();
+        });
+        added.addEventListener('close', () => lockScroll(false));
+      }
+      const c = colorOf(p, colorId);
+      $('[data-added-item]', added).innerHTML = `
+        <img class="cart-added__thumb" src="${img(imageOf(p, colorId), 160)}" alt="" width="160" height="160" decoding="async">
+        <div class="cart-added__info">
+          <p class="cart-added__name">${escapeHtml(p.name)}</p>
+          ${c ? `<p class="cart-added__meta">${variantLabel(p)}: ${escapeHtml(c.label)}</p>` : ''}
+          ${phone ? `<p class="cart-added__meta">Tipe HP: ${escapeHtml(phone)}</p>` : ''}
+          <p class="cart-added__price">${qty} x <strong class="price">${rupiah(priceOf(p, colorId))}</strong></p>
+        </div>`;
+      lockScroll(true);
+      added.showModal();
+    }
 
     // The buy panel's height, for its sticky top on wide screens (see .pdp-info in styles.css):
     // variants, the phone field and its hint all change it.
