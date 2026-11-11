@@ -22,8 +22,8 @@ crons = ["*/5 * * * *"]
 ENVIRONMENT = "staging"
 DEMO_PAYMENTS = "yes"   # the "Simulasi bayar" button; the Worker also checks the address
 
-# database_id is filled in once the database exists in the Cloudflare account.
+# The staging database in the Cloudflare account (the id is an address, not a secret).
 [[d1_databases]]
 binding = "DB"
 database_name = "nexura-staging"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "a1baed26-cf26-4da5-b8a1-f3aa548c525a"
