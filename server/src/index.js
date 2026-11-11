@@ -105,6 +105,14 @@ function phone(v, field = 'phone') {
   if (!/^\+?\d{9,15}$/.test(s)) throw bad('invalid_field', { field });
   return s;
 }
+const optionalPhone = (v) => (str(v) ? phone(v) : '');
+function birthDate(v) {
+  const s = str(v);
+  if (!s) return '';
+  const t = Date.parse(`${s}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(t) || t > Date.now() || s < '1900-01-01') throw bad('invalid_field', { field: 'birth' });
+  return s;
+}
 function password(v, field = 'password') {
   if (typeof v !== 'string' || v.length < 8 || v.length > 200) throw bad('invalid_field', { field });
   return v;
@@ -139,7 +147,7 @@ async function currentUser(ctx) {
   const token = cookies(ctx.request)[SESSION_COOKIE];
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
   const row = await ctx.db.prepare(
-    `SELECT u.id, u.email, u.name, u.phone, u.created_at, u.pw_changed, u.is_admin, s.token_hash
+    `SELECT u.id, u.email, u.name, u.phone, u.birth, u.created_at, u.pw_changed, u.is_admin, s.token_hash
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
   ).bind(await sha256(token), Date.now()).first();
@@ -155,7 +163,7 @@ async function requireAdmin(ctx) {
   if (!user.is_admin) throw new HttpError(403, 'admins_only');
   return user;
 }
-const publicUser = (u) => ({ email: u.email, name: u.name, phone: u.phone, created: u.created_at, pwChanged: u.pw_changed || null, ...(u.is_admin ? { admin: true } : {}) });
+const publicUser = (u) => ({ email: u.email, name: u.name, phone: u.phone, birth: u.birth || '', created: u.created_at, pwChanged: u.pw_changed || null, ...(u.is_admin ? { admin: true } : {}) });
 
 const guestId = (ctx) => {
   const id = cookies(ctx.request)[GUEST_COOKIE];
@@ -191,7 +199,7 @@ async function startSession(ctx, userId) {
 
 async function signUp(ctx) {
   const body = await readBody(ctx.request);
-  const data = { name: text(body.name, 'name', 2, 80), email: email(body.email), phone: phone(body.phone), password: password(body.password) };
+  const data = { name: text(body.name, 'name', 2, 80), email: email(body.email), phone: optionalPhone(body.phone), password: password(body.password) };
   await limit(ctx.db, `signup:${ctx.ip}`, 10, HOUR);
   await record(ctx.db, `signup:${ctx.ip}`);
   const salt = randomHex(16);
@@ -239,9 +247,10 @@ async function updateMe(ctx) {
   const user = await requireUser(ctx);
   const body = await readBody(ctx.request);
   const name = body.name === undefined ? user.name : text(body.name, 'name', 2, 80);
-  const tel = body.phone === undefined ? user.phone : phone(body.phone);
-  await ctx.db.prepare('UPDATE users SET name = ?, phone = ? WHERE id = ?').bind(name, tel, user.id).run();
-  return json(ctx, 200, { user: publicUser({ ...user, name, phone: tel }) });
+  const tel = body.phone === undefined ? user.phone : optionalPhone(body.phone);
+  const born = body.birth === undefined ? user.birth : birthDate(body.birth);
+  await ctx.db.prepare('UPDATE users SET name = ?, phone = ?, birth = ? WHERE id = ?').bind(name, tel, born, user.id).run();
+  return json(ctx, 200, { user: publicUser({ ...user, name, phone: tel, birth: born }) });
 }
 
 async function changePassword(ctx) {

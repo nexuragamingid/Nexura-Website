@@ -16,5 +16,8 @@ npx wrangler dev --local --port $PORT > out/dev.log 2>&1 &
 trap 'kill %1 2>/dev/null; pkill -f workerd 2>/dev/null || true' EXIT
 for _ in $(seq 1 40); do curl -s -o /dev/null --noproxy '*' "http://localhost:$PORT/api/me" && break; sleep 1; done
 node test/api.test.mjs "http://localhost:$PORT" "$(sed -n 2p out/test01-jeje.csv)" "$(sed -n 3p out/test01-jeje.csv)" NEXURA-SENSI-2026
-# Optional: also drive the admin page in a real browser.   ./run-tests.sh shots <folder>
-if [ "${1:-}" = "shots" ]; then node test/shots.mjs "http://localhost:$PORT" "$2"; fi
+# Optional: also drive the account pages and the admin page in a real browser.   ./run-tests.sh shots <folder>
+if [ "${1:-}" = "shots" ]; then
+  node test/account-pages.mjs "http://localhost:$PORT" "$2"
+  node test/shots.mjs "http://localhost:$PORT" "$2"
+fi

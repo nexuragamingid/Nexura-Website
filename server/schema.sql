@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   id          TEXT PRIMARY KEY,
   email       TEXT NOT NULL UNIQUE,
   name        TEXT NOT NULL,
-  phone       TEXT NOT NULL,
+  phone       TEXT NOT NULL DEFAULT '',     -- optional: sign-up does not ask for it
+  birth       TEXT NOT NULL DEFAULT '',     -- optional, YYYY-MM-DD
   pw_hash     TEXT NOT NULL,
   pw_salt     TEXT NOT NULL,
   pw_iter     INTEGER NOT NULL,

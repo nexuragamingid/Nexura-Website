@@ -161,100 +161,107 @@
   };
 
   /* ------------------------------------------------------------------
-     Accounts (Masuk, Daftar, Akun) and the order history.
-     TODO: there is no server yet, so all of it lives in this browser's localStorage: the users
-     (each password kept only as a salted hash), who is signed in and their paid orders. Enough
-     to click every flow through, and no more: nothing follows the user to another device, and
-     anyone at this browser can read it. When the backend exists, swap the bodies of `account`
-     and `orderBook` for calls to it; the pages only talk to these two.
+     Accounts (Masuk, Daftar, Akun)
+     The account lives on the server (server/src/index.js); this browser only holds a session
+     cookie it cannot read, and a copy of the profile (name, email, phone, birth) so the pages
+     can draw straight away. That copy is checked against the server on every page load and is
+     never proof of anything: the server decides who is signed in. No password, and no hash of
+     one, is ever kept here.
+     TODO: the order history still lives in this browser's localStorage (`orderBook`) until
+     checkout is connected too.
      ------------------------------------------------------------------ */
   const LOGIN_PAGE = `${SITE}masuk/`;
   const SIGNUP_PAGE = `${SITE}daftar/`;
   const ACCOUNT_PAGE = `${SITE}akun/`;
-  const USERS_KEY = 'nexura-users-v1';
-  const SESSION_KEY = 'nexura-session-v1';
+  const API = `${SITE}api/`;
+  const ME_KEY = 'nexura-me-v1';
+  const PHOTO_KEY = 'nexura-photo-v1';
   const ORDERS_KEY = 'nexura-orders-v1';
+  // The click-through prototype kept accounts (with password hashes) in this browser. Gone now.
+  try { localStorage.removeItem('nexura-users-v1'); localStorage.removeItem('nexura-session-v1'); } catch { /* nothing to clear */ }
 
-  // crypto.subtle only exists on https and localhost. A phone opening the dev server over the
-  // LAN gets FNV-1a instead, marked so a stored hash is always checked the way it was made.
-  async function digest(text, fnv = !crypto.subtle) {
-    if (!fnv) {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-      return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-    }
-    let h = 0x811c9dc5;
-    for (const ch of text) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
-    return `fnv:${h.toString(16)}`;
+  // { ok, status, data }. status 0: the server could not be reached.
+  async function api(method, path, body) {
+    try {
+      const res = await fetch(API + path, {
+        method, credentials: 'same-origin',
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      let data = {};
+      try { data = await res.json(); } catch { /* no body */ }
+      return { ok: res.ok, status: res.status, data };
+    } catch { return { ok: false, status: 0, data: {} }; }
   }
   const emailKey = (email) => String(email).trim().toLowerCase();
+  // 'ok', or why not: 'limited' (too many tries), 'offline', or the caller's own word for a refusal
+  const outcome = (res, refused) => (res.ok ? 'ok' : res.status === 429 ? 'limited' : res.status === 0 || res.status >= 500 ? 'offline' : refused);
 
   const account = {
-    users: () => storage.get(USERS_KEY) || {},
+    // The signed-in profile as last heard from the server, with this browser's avatar photo.
     current() {
-      const s = storage.get(SESSION_KEY);
-      return (s && account.users()[s.email]) || null;
+      const me = storage.get(ME_KEY);
+      if (!me || !me.email) return null;
+      const photo = (storage.get(PHOTO_KEY) || {})[me.email];
+      return photo ? { ...me, photo } : me;
     },
-    // 'ok', or 'exists' when the email already has an account
+    remember(user) {
+      if (user) { storage.set(ME_KEY, user); return; }
+      try { localStorage.removeItem(ME_KEY); } catch { /* nothing to clear */ }
+    },
+    // Asks the server who is signed in. true when that differs from what the page was drawn with.
+    async refresh() {
+      const before = account.current();
+      const res = await api('GET', 'me');
+      if (!res.ok) return false; // unreachable: keep what we have rather than signing anyone out
+      account.remember(res.data.user);
+      const after = account.current(); // read back: where storage is blocked nothing changes, and nothing should reload
+      return (before && before.email) !== (after && after.email);
+    },
+    // 'ok', 'exists', 'limited' or 'offline'
     async signUp({ name, email, phone, password }) {
-      const users = account.users();
-      const key = emailKey(email);
-      if (users[key]) return 'exists';
-      const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
-      users[key] = { name, email: key, phone, salt, hash: await digest(`${salt}:${password}`), created: Date.now() };
-      storage.set(USERS_KEY, users);
-      account.start(key);
-      return 'ok';
+      const res = await api('POST', 'auth/signup', { name, email: emailKey(email), phone, password });
+      if (res.ok) account.start(res.data.user);
+      return outcome(res, res.status === 409 ? 'exists' : 'offline');
     },
+    // 'ok', 'wrong', 'limited' or 'offline'
     async signIn(email, password) {
-      const user = account.users()[emailKey(email)];
-      if (!user) return false;
-      const fnv = user.hash.startsWith('fnv:');
-      // a SHA-256 hash can't be checked where crypto.subtle is missing
-      if (!fnv && !crypto.subtle) return false;
-      if (await digest(`${user.salt}:${password}`, fnv) !== user.hash) return false;
-      account.start(user.email);
-      return true;
+      const res = await api('POST', 'auth/login', { email: emailKey(email), password });
+      if (res.ok) account.start(res.data.user);
+      return outcome(res, 'wrong');
     },
-    start(email) { storage.set(SESSION_KEY, { email, at: Date.now() }); },
-    signOut() { try { localStorage.removeItem(SESSION_KEY); } catch { /* nothing to clear */ } },
-    // false when the current password is wrong
+    start(user) { account.remember(user); },
+    async signOut() {
+      await api('POST', 'auth/logout', {});
+      account.remember(null);
+    },
+    // 'ok', 'wrong', 'limited' or 'offline'
     async changePassword(current, next) {
-      const me = account.current();
-      if (!me) return false;
-      const fnv = me.hash.startsWith('fnv:');
-      if (!fnv && !crypto.subtle) return false;
-      if (await digest(`${me.salt}:${current}`, fnv) !== me.hash) return false;
-      const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
-      account.update({ salt, hash: await digest(`${salt}:${next}`), pwChanged: Date.now() });
-      return true;
+      const res = await api('POST', 'me/password', { current, next });
+      if (res.ok) account.remember({ ...storage.get(ME_KEY), pwChanged: res.data.pwChanged });
+      return outcome(res, 'wrong');
     },
-    // 'ok', or 'exists' when the new email has an account. Orders move to the new address with
-    // the account.
-    changeEmail(next) {
-      const me = account.current();
-      if (!me) return 'exists';
-      const key = emailKey(next);
-      if (key === me.email) return 'ok';
-      const users = account.users();
-      if (users[key]) return 'exists';
-      delete users[me.email];
-      users[key] = { ...me, email: key };
-      storage.set(USERS_KEY, users);
-      storage.set(ORDERS_KEY, orderBook.all().map((o) => (o.user === me.email ? { ...o, user: key } : o)));
-      const pending = storage.get(ORDER_KEY);
-      if (pending?.user === me.email) storage.set(ORDER_KEY, { ...pending, user: key });
-      storage.set(SESSION_KEY, { ...storage.get(SESSION_KEY), email: key });
-      return 'ok';
-    },
-    update(changes) {
+    // TODO: changing the sign-in email needs a code sent to the new address, which needs the
+    // email service. Until then the server has no way to do it, and this says so.
+    changeEmail() { return 'unavailable'; },
+    // The saved profile, or null when the server refused or could not be reached. A photo is
+    // kept in this browser only (TODO: upload it once there is file storage).
+    async update(changes) {
       const me = account.current();
       if (!me) return null;
-      const users = account.users();
-      users[me.email] = { ...me, ...changes };
-      storage.set(USERS_KEY, users);
-      return users[me.email];
+      const { photo, ...profile } = changes;
+      if (photo) storage.set(PHOTO_KEY, { ...storage.get(PHOTO_KEY), [me.email]: photo });
+      if (Object.keys(profile).length) {
+        const res = await api('PATCH', 'me', profile);
+        if (!res.ok) return null;
+        account.remember(res.data.user);
+      }
+      return account.current();
     },
   };
+  // What the page was drawn with came from the copy; if the server says otherwise (signed out
+  // elsewhere, session ended), draw again from the truth.
+  account.refresh().then((changed) => { if (changed) location.reload(); });
 
   // Paid orders, newest first. The payment page adds each one as it is paid.
   const orderBook = {
@@ -326,8 +333,8 @@
             <button class="dropdown-acc__out" type="button" data-nav-logout>${navIco(ICONS.logout)}Keluar</button>
           </div>`;
         a.replaceWith(dd);
-        $('[data-nav-logout]', dd).addEventListener('click', () => {
-          account.signOut();
+        $('[data-nav-logout]', dd).addEventListener('click', async () => {
+          await account.signOut();
           if (location.href.startsWith(ACCOUNT_PAGE)) location.replace(SITE); else location.reload();
         });
       });
@@ -365,8 +372,8 @@
       });
       // On Akun itself these only change the hash, so the drawer has to close by hand.
       $$('[data-menu-acc-link]', foot).forEach((a) => a.addEventListener('click', () => hideDrawer(menu, false)));
-      $('[data-menu-logout]', foot).addEventListener('click', () => {
-        account.signOut();
+      $('[data-menu-logout]', foot).addEventListener('click', async () => {
+        await account.signOut();
         if (location.href.startsWith(ACCOUNT_PAGE)) location.replace(SITE); else location.reload();
       });
     }
@@ -3165,6 +3172,11 @@
     if (next) a.href += `?lanjut=${encodeURIComponent(next)}`;
   });
 
+  // What to say when it was not the visitor's typing that went wrong.
+  const AUTH_TROUBLE = {
+    limited: 'Terlalu banyak percobaan. Coba lagi 15 menit lagi, ya.',
+    offline: 'Lagi nggak bisa nyambung ke server. Coba lagi sebentar, ya.',
+  };
   const loginForm = $('[data-login-form]');
   if (loginForm) {
     const error = $('[data-auth-error]', loginForm);
@@ -3212,9 +3224,10 @@
       error.hidden = true;
       if (!validate()) return;
       busy(submit, true, 'Masuk…');
-      const ok = await account.signIn($('#in-email', loginForm).value, $('#in-password', loginForm).value);
-      if (ok) { location.replace(nextUrl(ACCOUNT_PAGE)); return; }
+      const result = await account.signIn($('#in-email', loginForm).value, $('#in-password', loginForm).value);
+      if (result === 'ok') { location.replace(nextUrl(ACCOUNT_PAGE)); return; }
       busy(submit, false);
+      $('span', error).textContent = AUTH_TROUBLE[result] || 'Email atau passwordnya salah. Cek lagi, ya.';
       error.hidden = false;
       $('#in-password', loginForm).select();
       $('#in-password', loginForm).focus();
@@ -3236,6 +3249,7 @@
     $('#up-password', signupForm).addEventListener('input', (e) => {
       if (fieldOf(password2).classList.contains('is-invalid') && password2.value === e.target.value) setFieldError(password2, '');
     });
+    let existsHtml = '';
     signupForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       error.hidden = true;
@@ -3249,6 +3263,9 @@
       });
       if (result === 'ok') { location.replace(nextUrl(ACCOUNT_PAGE)); return; }
       busy(submit, false);
+      // The page's own message ("Email ini udah punya akun", with its Masuk link) is kept for that case.
+      if (!existsHtml) existsHtml = $('span', error).innerHTML;
+      if (AUTH_TROUBLE[result]) $('span', error).textContent = AUTH_TROUBLE[result]; else $('span', error).innerHTML = existsHtml;
       error.hidden = false;
       $('#up-email', signupForm).focus();
     });
@@ -3484,8 +3501,8 @@
       };
       renderHead(me);
 
-      $$('[data-acc-logout]', accPage).forEach((b) => b.addEventListener('click', () => {
-        account.signOut();
+      $$('[data-acc-logout]', accPage).forEach((b) => b.addEventListener('click', async () => {
+        await account.signOut();
         location.replace(SITE);
       }));
 
@@ -3721,14 +3738,15 @@
         'acc-birth': (v) => !v || (v >= birth.min && v <= birth.max) || 'Tanggal lahirnya belum bener.',
       });
       form.addEventListener('input', () => { status.hidden = true; });
-      form.addEventListener('submit', (e) => {
+      form.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!validate()) return;
-        const user = account.update({
+        const user = await account.update({
           name: $('#acc-name', form).value.trim().replace(/\s+/g, ' '),
           phone: $('#acc-phone', form).value.trim(),
           birth: birth.value,
         });
+        if (!user) { announce('Profil belum tersimpan. Coba lagi sebentar, ya.'); return; }
         renderHead(user);
         status.hidden = false;
         announce('Profil disimpan.');
@@ -3753,7 +3771,7 @@
         if (!file) return;
         if (!file.type.startsWith('image/')) { announce('Pilih file gambar, ya.'); return; }
         try {
-          const user = account.update({ photo: await squareOf(file) });
+          const user = await account.update({ photo: await squareOf(file) });
           renderHead(user);
           announce('Foto profil diganti.');
         } catch {
@@ -3924,10 +3942,10 @@
         e.preventDefault();
         if (!validatePw()) return;
         busy(pwSubmit, true, 'Menyimpan…');
-        const ok = await account.changePassword($('#acc-pw-current', pwForm).value, pwNew.value);
+        const result = await account.changePassword($('#acc-pw-current', pwForm).value, pwNew.value);
         busy(pwSubmit, false);
-        if (!ok) {
-          setFieldError($('#acc-pw-current', pwForm), 'Passwordnya salah.');
+        if (result !== 'ok') {
+          setFieldError($('#acc-pw-current', pwForm), AUTH_TROUBLE[result] || 'Passwordnya salah.');
           $('#acc-pw-current', pwForm).focus();
           return;
         }
@@ -3979,6 +3997,7 @@
         await new Promise((r) => setTimeout(r, 400));
         const result = account.changeEmail(mailNew.value);
         busy(mailSubmit, false);
+        if (result === 'unavailable') { setFieldError(mailNew, 'Ganti email belum bisa dari sini. Hubungi kami, ya.'); mailNew.focus(); return; }
         if (result === 'exists') { setFieldError(mailNew, 'Email ini udah dipakai akun lain.'); mailNew.focus(); return; }
         mailDialog.close();
         showMail(account.current().email);
