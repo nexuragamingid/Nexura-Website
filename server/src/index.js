@@ -342,6 +342,8 @@ async function catalog(ctx) {
     couriers: shop.couriers.map((c) => ({ id: c.id, label: c.label, price: c.price, days: [c.days_min, c.days_max] })),
     insurance: shop.cfg.insurance,
     payments: shop.cfg.payments,
+    qrisMinutes: shop.cfg.qrisMinutes,
+    ...(demoPayments(ctx) ? { demoPayments: true } : {}),
   });
 }
 
@@ -467,6 +469,29 @@ async function listOrders(ctx) {
   const orders = [];
   for (const row of results) orders.push(await readOrder(ctx.db, row.id, holder));
   return json(ctx, 200, { orders });
+}
+
+/* ------------------------------ payment ------------------------------ */
+
+// The one place an order becomes paid. Only a pending order can: its units are still held
+// (an expired order has already given them back), so nothing is sold that is not there.
+async function markPaid(db, id, ref) {
+  const res = await db.prepare("UPDATE orders SET status = 'paid', paid_at = ?, gateway_ref = ? WHERE id = ? AND status = 'pending'").bind(Date.now(), ref, id).run();
+  return res.meta.changes === 1;
+}
+
+/* Practice payments, for clicking the flow through before the gateway is connected. Two locks,
+   both needed: a setting that exists only in a developer's local file (never in the Cloudflare
+   account), and the address being this computer's own. On the real site this answers 404. */
+const demoPayments = (ctx) => ctx.env.DEMO_PAYMENTS === 'yes' && ['localhost', '127.0.0.1'].includes(ctx.url.hostname);
+async function demoPay(ctx) {
+  if (!demoPayments(ctx)) throw new HttpError(404, 'not_found');
+  const body = await readBody(ctx.request);
+  const holder = await holderOf(ctx);
+  const order = holder && await readOrder(ctx.db, str(body.id), holder);
+  if (!order) throw new HttpError(404, 'not_found');
+  if (!(await markPaid(ctx.db, order.id, 'demo'))) throw new HttpError(409, 'not_pending');
+  return json(ctx, 200, { order: await readOrder(ctx.db, order.id, holder) });
 }
 
 /* ------------------------------ sensi ------------------------------ */
@@ -613,6 +638,7 @@ const routes = [
   ['POST', /^\/api\/admin\/orders\/(NXR-\d{6}-[0-9A-Z]{6})\/ship$/, adminShip],
   ['GET', /^\/api\/admin\/stock$/, adminStock],
   ['PUT', /^\/api\/admin\/stock$/, adminSetStock],
+  ['POST', /^\/api\/payments\/demo\/pay$/, demoPay],
   // Payment gateway callback: not connected yet. Until it is, no order can become 'paid'.
   ['POST', /^\/api\/payments\/duitku\/callback$/, () => { throw new HttpError(501, 'not_connected'); }],
 ];
@@ -624,7 +650,7 @@ export default {
     try {
       if (!url.pathname.startsWith('/api/')) throw new HttpError(404, 'not_found');
       // A request that changes something must come from our own pages, not from another site.
-      if (request.method !== 'GET' && !url.pathname.startsWith('/api/payments/')) {
+      if (request.method !== 'GET' && !url.pathname.startsWith('/api/payments/duitku/')) {
         const origin = request.headers.get('Origin');
         if (origin && origin !== url.origin) throw new HttpError(403, 'wrong_origin');
         if (request.headers.get('Sec-Fetch-Site') === 'cross-site') throw new HttpError(403, 'wrong_origin');

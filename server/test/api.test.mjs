@@ -115,6 +115,11 @@ r = await stranger('POST', '/api/payments/duitku/callback', { merchantOrderId: o
 r = await ani('GET', `/api/orders/${orderA}`);
 check('nobody can mark an order paid by calling the callback', r.data.order.status === 'pending');
 
+r = await ani('POST', '/api/payments/demo/pay', { id: orderA });
+const demoOn = (await ani('GET', '/api/catalog')).data.demoPayments === true;
+if (demoOn) console.log('  (practice payments are ON for this run: skipping the check that they are off)');
+else check('practice payments do not exist unless switched on locally', r.status === 404, String(r.status));
+
 console.log('Guest checkout');
 r = await guest('POST', '/api/orders', cartOk);
 check('a guest can order', r.status === 201);

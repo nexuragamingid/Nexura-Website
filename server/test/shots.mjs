@@ -8,7 +8,7 @@ const addr = { name: 'Rina <script>alert(1)</script>', phone: '081234567890', st
 await post('/api/auth/signup', { name: 'Admin Nexura', email: 'admin@example.com', phone: '081200000000', password: 'admin-lokal-123' });
 sql("UPDATE users SET is_admin = 1 WHERE email = 'admin@example.com'");
 const ids = [];
-for (const items of [[{ id: 'iceglow', variant: 'ungu', qty: 2 }, { id: 'hydrogel-matte', variant: 'fullscreen', qty: 1, phoneModel: 'iPhone 15 Pro' }], [{ id: 'vortex', variant: 'merah', qty: 3 }]]) {
+for (const items of [[{ id: 'iceglow', variant: 'pink', qty: 2 }, { id: 'hydrogel-matte', variant: 'case-friendly', qty: 1, phoneModel: 'iPhone 15 Pro' }], [{ id: 'vortex', variant: 'biru', qty: 3 }]]) {
   const r = await (await post('/api/orders', { items, courier: 'reguler', insured: true, pay: 'qris', note: 'Tolong bubble wrap', address: addr })).json();
   ids.push(r.order.id);
 }

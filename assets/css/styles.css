@@ -4796,3 +4796,6 @@ a.cmp__media:hover { --cut-line: #584066; }
    on one line. Draco's sizes were set for a face drawn squeezed to 63%, so Tungsten read small. */
 .font-preview .home .section-head .section-title { font-size: clamp(3.125rem, calc(9.2 * var(--cqi)), 7rem); line-height: 1; }
 @media (max-width: 599px) { .font-preview .home .section-head .section-title { font-size: calc(13.4 * var(--cqi)); } }
+
+/* Checkout: why an order could not be placed (out of stock, server unreachable), above Bayar Sekarang */
+.co-trouble { margin: 16px 0; padding: 10px 12px; border: 1px solid rgba(255, 107, 107, .5); border-radius: 10px; color: #ffb3b3; font-size: .875rem; line-height: 1.4; }

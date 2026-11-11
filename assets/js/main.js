@@ -1,6 +1,33 @@
 (() => {
   'use strict';
 
+  /* Prices, stock and delivery options are the server's (it is what orders are priced from).
+     data.js holds the same figures as a starting point; the server's latest answer, kept from
+     the previous page view, is laid over them here before anything is drawn. */
+  const CATALOG_KEY = 'nexura-catalog-v1';
+  (() => {
+    let c;
+    try { c = JSON.parse(localStorage.getItem(CATALOG_KEY)); } catch { return; }
+    if (!c || !Array.isArray(c.products)) return;
+    const N = window.NEXURA;
+    for (const sp of c.products) {
+      const p = N.products.find((x) => x.id === sp.id);
+      if (!p) continue;
+      p.price = sp.price;
+      const states = sp.variants.length ? sp.variants.map((v) => v.stock) : [sp.stock];
+      p.stock = states.includes('in') ? 'in' : states.includes('low') ? 'low' : 'out';
+      for (const sv of sp.variants) {
+        const colour = (p.colors || []).find((x) => x.id === sv.id);
+        if (!colour) continue;
+        if (sv.price !== sp.price) colour.price = sv.price; else delete colour.price;
+      }
+    }
+    if (Array.isArray(c.couriers) && c.couriers.length) N.checkout.couriers = c.couriers;
+    if (c.insurance) N.checkout.insurance = c.insurance;
+    if (c.qrisMinutes) N.checkout.qrisMinutes = c.qrisMinutes;
+    if (Array.isArray(c.payments)) N.checkout.payments = N.checkout.payments.filter((m) => c.payments.includes(m.id));
+  })();
+
   const { products, categories, categoryLeads, compareLabels, video, social, reviews, store } = window.NEXURA;
   const byId = Object.fromEntries(products.map((p) => [p.id, p]));
   // A second local preview (python3 -m http.server 8001) shows the site with Tungsten in place
@@ -207,7 +234,8 @@
     },
     remember(user) {
       if (user) { storage.set(ME_KEY, user); return; }
-      try { localStorage.removeItem(ME_KEY); } catch { /* nothing to clear */ }
+      // Signed out: the profile copy goes, and so do the orders this browser was showing.
+      try { [ME_KEY, ORDERS_KEY, ORDER_KEY].forEach((k) => localStorage.removeItem(k)); } catch { /* nothing to clear */ }
     },
     // Asks the server who is signed in. true when that differs from what the page was drawn with.
     async refresh() {
@@ -262,14 +290,51 @@
   // What the page was drawn with came from the copy; if the server says otherwise (signed out
   // elsewhere, session ended), draw again from the truth.
   account.refresh().then((changed) => { if (changed) location.reload(); });
+  // The catalogue for the next page view (see the top of this file).
+  api('GET', 'catalog').then((res) => { if (res.ok) storage.set(CATALOG_KEY, res.data); });
 
-  // Paid orders, newest first. The payment page adds each one as it is paid.
+  // An order as the server gives it, in the shape the pages draw (photo, variant line and
+  // courier name come from data.js; every figure is the server's).
+  function localOrder(o) {
+    const courier = window.NEXURA.checkout.couriers.find((c) => c.id === o.courier);
+    return {
+      id: o.id, pay: o.pay, created: o.created, expires: o.expires, paid: o.paid || 0,
+      status: o.status, shipped: o.shipped || 0, tracking: o.tracking || '',
+      items: o.items.map((it) => {
+        const p = byId[it.id];
+        return {
+          id: it.id, color: it.variant, phone: it.phoneModel || '', name: it.name,
+          meta: [it.variantLabel ? `${p ? variantLabel(p) : 'Varian'}: ${it.variantLabel}` : (p ? categories[p.category] : ''), it.phoneModel ? `Tipe HP: ${it.phoneModel}` : ''].filter(Boolean).join(' · '),
+          qty: it.qty, price: it.price, was: 0,
+          image: p ? img(imageOf(p, it.variant), 160) : '',
+        };
+      }),
+      totals: {
+        units: o.items.reduce((n, it) => n + it.qty, 0), gross: o.totals.goods, goods: o.totals.goods,
+        ship: o.totals.shipping, ins: o.totals.insurance, promo: o.totals.discount, total: o.totals.total,
+      },
+      courier: courier ? courier.label : o.courier,
+      courierDays: courier ? courier.days : null,
+      user: account.current()?.email || null,
+      address: { name: o.address.name, phone: o.address.phone, line: `${o.address.street}, ${o.address.city}, ${o.address.postal}` },
+    };
+  }
+
+  // This account's (or this guest browser's) orders, newest first, as last heard from the server.
   const orderBook = {
     all: () => storage.get(ORDERS_KEY) || [],
     add(order) {
       storage.set(ORDERS_KEY, [order, ...orderBook.all().filter((o) => o.id !== order.id)].slice(0, 50));
     },
     of: (email) => orderBook.all().filter((o) => o.user === email),
+    // Asks the server again. true when the list is not what the page was drawn with.
+    async refresh() {
+      const res = await api('GET', 'orders');
+      if (!res.ok) return false;
+      const before = JSON.stringify(orderBook.all());
+      storage.set(ORDERS_KEY, res.data.orders.map(localOrder));
+      return JSON.stringify(orderBook.all()) !== before;
+    },
   };
 
   // A page's address relative to the site root, for ?lanjut= (where to go after signing in).
@@ -1909,7 +1974,19 @@
     });
 
     /* Pay */
-    $('[data-co-submit]', coPage).addEventListener('click', () => {
+    // Why an order could not be placed, above the button; empty hides it.
+    const coTroubleBox = document.createElement('p');
+    coTroubleBox.className = 'co-trouble';
+    coTroubleBox.setAttribute('role', 'alert');
+    coTroubleBox.hidden = true;
+    // Above the pay bar, not in it: on phones the bar is pinned to the foot of the screen and has no room.
+    $('[data-co-submit]', coPage).closest('[data-pay-dock]').before(coTroubleBox);
+    const coTrouble = (msg) => {
+      coTroubleBox.textContent = msg;
+      coTroubleBox.hidden = !msg;
+      if (msg) coTroubleBox.scrollIntoView({ block: 'center', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+    };
+    $('[data-co-submit]', coPage).addEventListener('click', async (e) => {
       if (!address) {
         addrError.hidden = false;
         addrCard.classList.add('is-invalid');
@@ -1920,35 +1997,34 @@
       // TODO: only QRIS has a payment page so far; the e-wallets stop here until the gateway
       // is connected (PRD 16).
       if (prefs.pay !== 'qris') return;
-      // TODO: create the order at the payment gateway and keep the QR, NMID and expiry it
-      // returns. Until then the order lives in this browser and the QR is a placeholder.
-      const t = totals();
-      const now = Date.now();
-      const stamp = new Date(now);
-      const pad = (n) => String(n).padStart(2, '0');
-      storage.set(ORDER_KEY, {
-        id: `NXR-${String(stamp.getFullYear()).slice(2)}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}-${String(Math.floor(Math.random() * 1e4)).padStart(4, '0')}`,
-        pay: prefs.pay,
-        created: now,
-        expires: now + cfg.qrisMinutes * 60000,
-        items: lines().map((it) => {
-          const p = byId[it.id];
-          const c = colorOf(p, it.color);
-          return {
-            id: it.id, color: it.color, phone: it.phone,
-            name: p.name,
-            meta: [c ? `${variantLabel(p)}: ${c.label}` : categories[p.category], it.phone ? `Tipe HP: ${it.phone}` : ''].filter(Boolean).join(' · '),
-            qty: it.qty, price: priceOf(p, it.color), was: wasOf(p, it.color) || 0,
-            image: img(imageOf(p, it.color), 160),
-          };
-        }),
-        totals: t,
-        courier: courierOf(prefs.courier).label,
-        courierDays: courierOf(prefs.courier).days,
-        // whose Pesanan Saya it lands in; null for a guest checkout
-        user: account.current()?.email || null,
-        address: { name: address.name, phone: address.phone, line: `${address.street}, ${address.city}, ${address.postal}` },
+      // The order is made by the server, which prices it from its own catalogue and holds the
+      // stock; what comes back (number, totals, deadline) is what the payment page shows.
+      // TODO: the QR on the payment page is still a placeholder until the gateway is connected.
+      const btn = e.currentTarget;
+      coTrouble('');
+      btn.disabled = true;
+      btn.setAttribute('aria-busy', 'true');
+      const res = await api('POST', 'orders', {
+        items: lines().map((it) => ({ id: it.id, ...(it.color ? { variant: it.color } : {}), qty: it.qty, ...(it.phone ? { phoneModel: it.phone } : {}) })),
+        courier: prefs.courier, insured: !!prefs.insured, pay: prefs.pay, note: prefs.note || '',
+        ...(prefs.promo ? { promo: prefs.promo } : {}),
+        address: { name: address.name, phone: address.phone, street: address.street, city: address.city, postal: address.postal },
       });
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+      if (!res.ok) {
+        const p = byId[res.data.id];
+        const c = p && res.data.variant ? colorOf(p, res.data.variant) : null;
+        coTrouble(
+          res.data.error === 'out_of_stock' ? `${p ? p.short : 'Salah satu produk'}${c ? ` ${c.label}` : ''} stoknya nggak cukup. Kurangi jumlahnya atau hapus dari keranjang, ya.`
+            : res.status === 429 ? 'Terlalu banyak pesanan dari sini. Coba lagi nanti, ya.'
+            : res.data.error === 'invalid_field' && String(res.data.field).startsWith('address') ? 'Alamatnya belum lengkap. Cek lagi nama, nomor HP, dan kode posnya.'
+            : res.data.error === 'invalid_field' ? 'Ada isian yang belum benar. Cek lagi keranjang dan tipe HP-nya.'
+            : 'Pesanan belum bisa dibuat. Coba lagi sebentar, ya.',
+        );
+        return;
+      }
+      storage.set(ORDER_KEY, localOrder(res.data.order));
       location.href = PAY_PAGE;
     });
 
@@ -1969,6 +2045,15 @@
   const payPage = $('[data-pay-page]');
   if (payPage) {
     const minutes = window.NEXURA.checkout.qrisMinutes;
+    // "Bayar Sekarang" on an order in Pesanan Saya comes here with ?id=: that order is fetched
+    // and the page opened again on it.
+    const wantId = new URLSearchParams(location.search).get('id');
+    if (wantId && storage.get(ORDER_KEY)?.id !== wantId) {
+      api('GET', `orders/${encodeURIComponent(wantId)}`).then((res) => {
+        if (res.ok) storage.set(ORDER_KEY, localOrder(res.data.order));
+        location.replace(PAY_PAGE);
+      });
+    }
     const order = storage.get(ORDER_KEY);
     const ready = order && order.pay === 'qris' && order.items?.length;
     if (ready && order.paid) location.replace(PAID_PAGE);
@@ -2031,20 +2116,17 @@
         renewBtn.hidden = false;
       }
 
-      // TODO: ask the gateway for a fresh QR. For now the same one gets a new deadline.
-      renewBtn.addEventListener('click', () => {
-        order.expires = Date.now() + minutes * 60000;
-        storage.set(ORDER_KEY, order);
-        start();
-        saveBtn.focus();
-        announce(`QR baru dibuat. Bayar dalam ${minutes} menit.`);
-      });
+      // An order past its window has given its stock back, so it cannot simply be reopened:
+      // checkout makes a new one (the cart still holds the items).
+      renewBtn.addEventListener('click', () => { location.href = CHECKOUT_PAGE; });
 
       // Paid: the order is marked, its lines leave the cart, and Pembayaran Berhasil takes this
       // page's place in history, so Back doesn't land on a paid QR.
-      function markPaid() {
+      function markPaid(at) {
         clearInterval(timer);
-        order.paid = Date.now();
+        clearInterval(poll);
+        order.paid = at || Date.now();
+        order.status = 'paid';
         storage.set(ORDER_KEY, order);
         orderBook.add(order);
         const bought = new Set(order.items.map((it) => cart.keyOf(it)));
@@ -2052,22 +2134,43 @@
         location.replace(PAID_PAGE);
       }
 
-      // Stand-in for asking the gateway: a short "Mengecek…", then the order counts as paid, so
-      // the whole flow can be clicked through. Unpaid, nothing would show on screen and screen
-      // readers would hear "Pembayaran belum masuk." TODO: ask the gateway here (and poll it
-      // every few seconds while the page is open); call markPaid() only when it says paid.
-      checkBtn.addEventListener('click', () => {
+      // Whether it is paid is the server's to say (it hears it from the gateway), never this page's.
+      // Asked when Cek Status is pressed, and quietly every few seconds while the page is open.
+      const ask = async () => { const res = await api('GET', `orders/${encodeURIComponent(order.id)}`); return res.ok ? res.data.order : null; };
+      const settle = (now) => {
+        if (!now) return false;
+        if (now.status === 'paid' || now.status === 'shipped') { markPaid(now.paid); return true; }
+        if (now.status === 'expired' && !sheet.classList.contains('is-expired')) { order.expires = Math.min(order.expires, Date.now()); storage.set(ORDER_KEY, order); expire(); }
+        return false;
+      };
+      const poll = setInterval(async () => { if (!document.hidden && !sheet.classList.contains('is-expired')) settle(await ask()); }, 5000);
+      checkBtn.addEventListener('click', async () => {
         checkBtn.disabled = true;
         checkBtn.setAttribute('aria-busy', 'true');
         checkText.textContent = 'Mengecek…';
-        setTimeout(() => {
-          const paid = true; // TODO: the gateway's answer
-          if (paid) { markPaid(); return; }
-          checkBtn.disabled = false;
-          checkBtn.removeAttribute('aria-busy');
-          checkText.textContent = 'Cek Status';
-          announce('Pembayaran belum masuk.');
-        }, 800);
+        if (settle(await ask())) return;
+        checkBtn.disabled = false;
+        checkBtn.removeAttribute('aria-busy');
+        checkText.textContent = 'Belum masuk. Cek lagi';
+        announce('Pembayaran belum masuk.');
+        setTimeout(() => { checkText.textContent = 'Cek Status'; }, 3000);
+      });
+
+      // Practice mode (a developer's own computer only; the server refuses it anywhere else):
+      // a button that pays the order, so the flow can be clicked through before the gateway is connected.
+      api('GET', 'catalog').then((res) => {
+        if (!res.ok || !res.data.demoPayments) return;
+        const demo = document.createElement('button');
+        demo.type = 'button';
+        demo.className = 'btn btn--secondary btn--block';
+        demo.dataset.payDemo = '';
+        demo.style.margin = '16px 0';
+        demo.textContent = 'Simulasi bayar (mode tes)';
+        checkBtn.closest('[data-pay-dock]').before(demo);
+        demo.addEventListener('click', async () => {
+          const paid = await api('POST', 'payments/demo/pay', { id: order.id });
+          if (paid.ok) markPaid(paid.data.order.paid);
+        });
       });
 
       /* Copy the total, as plain digits so it pastes straight into an amount field */
@@ -3561,31 +3664,33 @@
       const dateFmt = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
       const timeFmt = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
       const STAGES = { unpaid: 'Belum Bayar', packed: 'Dikemas', shipped: 'Dikirim', done: 'Selesai', cancelled: 'Dibatalkan' };
+      // Paid and shipped are the server's word (shipped once the shop enters the resi). Arrival
+      // is the courier's estimate only: nothing tells the site a parcel was delivered yet.
       function stepsOf(o) {
         const [, late] = o.courierDays || [2, 3];
-        const steps = [
-          { label: 'Pesanan dibayar', at: o.paid },
-          { label: 'Sedang dikemas', at: o.paid + 60e3 },
-          { label: 'Diserahkan ke kurir', at: o.paid + DAY },
-          { label: 'Sampai tujuan', at: o.paid + (late + 1) * DAY },
+        const sent = o.shipped || 0;
+        return [
+          { label: 'Pesanan dibayar', at: o.paid, done: true },
+          { label: 'Sedang dikemas', at: o.paid, done: true },
+          { label: 'Diserahkan ke kurir', at: sent || o.paid + DAY, done: !!sent },
+          { label: 'Sampai tujuan', at: (sent || o.paid + DAY) + late * DAY, done: false },
         ];
-        const now = Date.now();
-        steps.forEach((s) => { s.done = s.at <= now; });
-        return steps;
       }
       // Dibatalkan: an order marked so, or one left unpaid past its payment window. TODO: take
       // cancellations (by the buyer, the shop or the gateway) from the backend once it exists.
       function stageOf(o) {
-        if (o.cancelled || (!o.paid && o.expires && o.expires <= Date.now())) return 'cancelled';
+        if (o.status === 'cancelled' || o.status === 'expired' || (!o.paid && o.expires && o.expires <= Date.now())) return 'cancelled';
         if (!o.paid) return 'unpaid';
-        const done = stepsOf(o).filter((s) => s.done).length;
-        return done >= 4 ? 'done' : done >= 3 ? 'shipped' : 'packed';
+        return o.shipped ? 'shipped' : 'packed';
       }
       const pending = storage.get(ORDER_KEY);
+      const book = orderBook.of(me.email);
       const orders = [
-        ...(pending && !pending.paid && pending.user === me.email && pending.items?.length ? [pending] : []),
-        ...orderBook.of(me.email),
+        ...(pending && !pending.paid && pending.user === me.email && pending.items?.length && !book.some((o) => o.id === pending.id) ? [pending] : []),
+        ...book,
       ];
+      // Drawn from the copy; if the server's list differs (paid, shipped, ordered elsewhere), draw again.
+      orderBook.refresh().then((changed) => { if (changed) location.reload(); });
       const list = $('[data-acc-orders]', accPage);
       const empty = $('[data-acc-orders-empty]', accPage);
       const filters = $('[data-acc-filter]', accPage);
@@ -3624,7 +3729,7 @@
                 ? `<a class="btn btn--secondary acc-order__btn" href="${byId[first.id] ? detailUrl(byId[first.id]) : PRODUCTS_PAGE}">Beli Lagi</a>`
                 : o.paid
                 ? `<button class="btn btn--secondary acc-order__btn" type="button" aria-expanded="false" aria-controls="track-${escapeHtml(o.id)}" data-acc-track>Lacak</button>`
-                : `<a class="btn btn--primary acc-order__btn" href="${PAY_PAGE}">Bayar Sekarang</a>`}
+                : `<a class="btn btn--primary acc-order__btn" href="${PAY_PAGE}?id=${encodeURIComponent(o.id)}">Bayar Sekarang</a>`}
             </div>
             ${o.paid && stage !== 'cancelled' ? `
             <div class="acc-track" id="track-${escapeHtml(o.id)}" hidden>
@@ -3638,7 +3743,7 @@
               </ol>
               <dl class="acc-track__rows">
                 <div><dt>Kurir</dt><dd>${escapeHtml(o.courier || '-')}</dd></div>
-                <div><dt>No. Resi</dt><dd class="is-pending">${stage === 'packed' ? 'Muncul setelah paket dikirim' : 'Menyusul'}</dd></div>
+                <div><dt>No. Resi</dt>${o.tracking ? `<dd>${escapeHtml(o.tracking)}</dd>` : `<dd class="is-pending">${stage === 'packed' ? 'Muncul setelah paket dikirim' : 'Menyusul'}</dd>`}</div>
                 <div><dt>Dikirim ke</dt><dd>${escapeHtml(o.address.name)}<br>${escapeHtml(o.address.line)}</dd></div>
               </dl>
             </div>` : ''}
