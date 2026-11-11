@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   pw_salt     TEXT NOT NULL,
   pw_iter     INTEGER NOT NULL,
   pw_changed  INTEGER,
+  is_admin    INTEGER NOT NULL DEFAULT 0,   -- set by hand in the database, never from the site
   created_at  INTEGER NOT NULL
 );
 
@@ -46,7 +47,6 @@ CREATE TABLE IF NOT EXISTS products (
   name         TEXT NOT NULL,
   category     TEXT NOT NULL,
   price        INTEGER NOT NULL CHECK (price > 0),
-  stock        TEXT NOT NULL CHECK (stock IN ('in', 'low', 'out')),
   phone_model  INTEGER NOT NULL DEFAULT 0
 );
 
@@ -56,6 +56,17 @@ CREATE TABLE IF NOT EXISTS variants (
   label       TEXT NOT NULL,
   price       INTEGER CHECK (price IS NULL OR price > 0),   -- NULL: the product's price
   PRIMARY KEY (product_id, id)
+);
+
+-- Units set aside for the website (the marketplaces have their own). One row per variant;
+-- variant_id is '' for a product without variants. An order takes its units the moment it is
+-- placed and gives them back if it is not paid in time. The CHECK is what stops the last unit
+-- being sold twice: a sale that would go below zero fails as a whole.
+CREATE TABLE IF NOT EXISTS stock (
+  product_id  TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  variant_id  TEXT NOT NULL DEFAULT '',
+  qty         INTEGER NOT NULL CHECK (qty >= 0),
+  PRIMARY KEY (product_id, variant_id)
 );
 
 CREATE TABLE IF NOT EXISTS couriers (
@@ -85,7 +96,7 @@ CREATE TABLE IF NOT EXISTS settings (
 CREATE TABLE IF NOT EXISTS orders (
   id            TEXT PRIMARY KEY,
   holder        TEXT NOT NULL,
-  status        TEXT NOT NULL CHECK (status IN ('pending', 'paid', 'expired', 'cancelled')),
+  status        TEXT NOT NULL CHECK (status IN ('pending', 'paid', 'shipped', 'expired', 'cancelled')),
   goods         INTEGER NOT NULL,
   shipping      INTEGER NOT NULL,
   insurance     INTEGER NOT NULL,
@@ -103,8 +114,11 @@ CREATE TABLE IF NOT EXISTS orders (
   gateway_ref   TEXT,
   created_at    INTEGER NOT NULL,
   expires_at    INTEGER NOT NULL,
-  paid_at       INTEGER
+  paid_at       INTEGER,
+  shipped_at    INTEGER,
+  tracking_no   TEXT
 );
+CREATE INDEX IF NOT EXISTS orders_status ON orders(status, expires_at);
 CREATE INDEX IF NOT EXISTS orders_holder ON orders(holder, created_at);
 
 CREATE TABLE IF NOT EXISTS order_items (
@@ -139,6 +153,21 @@ CREATE TABLE IF NOT EXISTS sensi_codes (
   claimed_at  INTEGER
 );
 CREATE INDEX IF NOT EXISTS sensi_holder ON sensi_codes(holder);
+
+-- The QR printed on today's packs is the same on every pack, so it cannot be one-time.
+-- Opening it needs an account instead, and each account's opened players are kept here.
+-- player_id NULL on a shared code means it opens every player.
+CREATE TABLE IF NOT EXISTS sensi_shared (
+  code_hash  TEXT PRIMARY KEY,
+  player_id  TEXT REFERENCES sensi_players(id),
+  label      TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sensi_claims (
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  player_id   TEXT NOT NULL REFERENCES sensi_players(id),
+  claimed_at  INTEGER NOT NULL,
+  PRIMARY KEY (user_id, player_id)
+);
 
 -- Attempt counter behind the rate limits (sign-in, sign-up, code guessing).
 CREATE TABLE IF NOT EXISTS rate_events (

@@ -4,3 +4,5 @@ node_modules/
 .dev.vars
 # Generated: the printable sensi codes are secrets too.
 out/
+# Built copy of the pages (scripts/build-site.mjs)
+site/

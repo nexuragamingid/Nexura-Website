@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "puppeteer-core": "^25.17.0",
     "wrangler": "^4.160.0"
   }
 }

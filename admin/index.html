@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0C0310">
+<title>Admin Nexura</title>
+<style>
+  :root { --bg: #0C0310; --panel: #17091F; --line: #2E1B3D; --text: #F4EEFA; --muted: #A894BC; --accent: #9B5CF6; --ok: #3DD68C; --warn: #F2B705; --bad: #FF6B6B; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 2; }
+  header h1 { font-size: 17px; margin: 0; flex: 1; letter-spacing: .02em; }
+  main { max-width: 960px; margin: 0 auto; padding: 16px; }
+  button, input, select { font: inherit; color: inherit; }
+  button { background: var(--accent); border: 0; border-radius: 10px; padding: 10px 16px; font-weight: 600; cursor: pointer; min-height: 44px; }
+  button.quiet { background: transparent; border: 1px solid var(--line); font-weight: 500; }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; width: 100%; }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+  .field { margin-bottom: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .login { max-width: 380px; margin: 12vh auto 0; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tabs button { background: transparent; border: 1px solid var(--line); font-weight: 500; }
+  .tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .bar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .bar select { width: auto; }
+  .bar .count { color: var(--muted); margin-left: auto; font-size: 13px; }
+  .order-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .order-head strong { font-size: 16px; }
+  .order-head time { color: var(--muted); font-size: 13px; }
+  .pill { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid currentColor; }
+  .pill.pending { color: var(--warn); } .pill.paid { color: var(--ok); } .pill.shipped { color: var(--accent); } .pill.expired, .pill.cancelled { color: var(--muted); }
+  .total { margin-left: auto; font-weight: 700; font-size: 16px; }
+  .items { margin: 12px 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+  .items li { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .items .qty { color: var(--muted); min-width: 28px; }
+  .items .name { flex: 1; }
+  .items small { display: block; color: var(--muted); }
+  .addr { color: var(--muted); font-size: 14px; white-space: pre-line; overflow-wrap: anywhere; }
+  .addr b { color: var(--text); font-weight: 600; }
+  .ship { display: flex; gap: 8px; margin-top: 12px; }
+  .ship input { flex: 1; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-size: 12px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+  td.qty { width: 110px; } td.qty input { text-align: right; }
+  td small { display: block; color: var(--muted); }
+  tr.changed td { background: rgba(155, 92, 246, .12); }
+  .save { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; display: flex; gap: 12px; align-items: center; }
+  .msg { font-size: 14px; color: var(--muted); } .msg.bad { color: var(--bad); } .msg.ok { color: var(--ok); }
+  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+  [hidden] { display: none !important; }
+  @media (max-width: 520px) { .total { margin-left: 0; width: 100%; } .ship { flex-direction: column; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Admin Nexura</h1>
+  <button class="quiet" id="logout" hidden>Keluar</button>
+</header>
+
+<main>
+  <form class="card login" id="login" hidden novalidate>
+    <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
+    <div class="field"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div>
+    <button type="submit">Masuk</button>
+    <p class="msg bad" id="login-msg" role="alert"></p>
+  </form>
+
+  <p class="empty" id="denied" hidden>Akun ini bukan admin.</p>
+
+  <section id="app" hidden>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-orders" aria-selected="true" aria-controls="orders">Pesanan</button>
+      <button role="tab" id="tab-stock" aria-selected="false" aria-controls="stock">Stok</button>
+    </div>
+
+    <div id="orders" role="tabpanel" aria-labelledby="tab-orders">
+      <div class="bar">
+        <label for="filter" style="margin:0">Status</label>
+        <select id="filter">
+          <option value="paid">Sudah dibayar, belum dikirim</option>
+          <option value="pending">Menunggu pembayaran</option>
+          <option value="shipped">Sudah dikirim</option>
+          <option value="expired">Kedaluwarsa</option>
+          <option value="">Semua</option>
+        </select>
+        <button class="quiet" id="refresh">Muat ulang</button>
+        <span class="count" id="order-count"></span>
+      </div>
+      <div id="order-list"></div>
+    </div>
+
+    <div id="stock" role="tabpanel" aria-labelledby="tab-stock" hidden>
+      <p class="msg">Jatah stok khusus website. Angka turun otomatis saat ada pesanan, dan naik lagi kalau pesanan tidak dibayar dalam 15 menit.</p>
+      <table>
+        <thead><tr><th>Produk</th><th>Varian</th><th style="text-align:right">Jumlah</th></tr></thead>
+        <tbody id="stock-rows"></tbody>
+      </table>
+      <div class="save">
+        <button id="save-stock" disabled>Simpan</button>
+        <span class="msg" id="stock-msg" role="status"></span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  // Every value from the server is placed as text, never as HTML: names, addresses and notes
+  // are typed by buyers, and this page must not run anything they type.
+  const el = (tag, props = {}, ...children) => {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) { if (k === 'class') node.className = v; else if (k === 'text') node.textContent = v; else node.setAttribute(k, v); }
+    node.append(...children.filter((c) => c != null));
+    return node;
+  };
+  const rupiah = (n) => 'Rp' + Number(n).toLocaleString('id-ID');
+  const when = (ms) => new Date(ms).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const STATUS = { pending: 'Menunggu bayar', paid: 'Dibayar', shipped: 'Dikirim', expired: 'Kedaluwarsa', cancelled: 'Dibatalkan' };
+  const ERRORS = { wrong_email_or_password: 'Email atau password salah.', too_many_attempts: 'Terlalu banyak percobaan. Coba lagi 15 menit lagi.', not_paid: 'Pesanan ini belum dibayar.', invalid_field: 'Ada isian yang belum benar.' };
+
+  async function api(method, path, body) {
+    const res = await fetch('../api' + path, { method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+    let data = {};
+    try { data = await res.json(); } catch { /* empty */ }
+    if (!res.ok) { const e = new Error(ERRORS[data.error] || 'Gagal. Coba lagi.'); e.status = res.status; throw e; }
+    return data;
+  }
+
+  function show(view) {
+    $('login').hidden = view !== 'login';
+    $('denied').hidden = view !== 'denied';
+    $('app').hidden = view !== 'app';
+    $('logout').hidden = view === 'login';
+  }
+
+  async function start() {
+    let me = null;
+    try { me = (await api('GET', '/me')).user; } catch { /* treated as signed out */ }
+    if (!me) return show('login');
+    if (!me.admin) return show('denied');
+    show('app');
+    loadOrders();
+  }
+
+  $('login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('login-msg').textContent = '';
+    try {
+      await api('POST', '/auth/login', { email: $('email').value, password: $('password').value });
+      $('password').value = '';
+      start();
+    } catch (err) { $('login-msg').textContent = err.message; }
+  });
+  $('logout').addEventListener('click', async () => { try { await api('POST', '/auth/logout', {}); } finally { show('login'); } });
+
+  /* Orders */
+  function orderCard(o) {
+    const head = el('div', { class: 'order-head' },
+      el('strong', { text: o.id }),
+      el('span', { class: 'pill ' + o.status, text: STATUS[o.status] || o.status }),
+      el('time', { text: when(o.created) + (o.guest ? ' · tamu' : '') }),
+      el('span', { class: 'total', text: rupiah(o.totals.total) }));
+    const items = el('ul', { class: 'items' }, ...o.items.map((it) => el('li', {},
+      el('span', { class: 'qty', text: it.qty + '×' }),
+      el('span', { class: 'name', text: it.name }, el('small', { text: [it.variantLabel, it.phoneModel && 'Tipe HP: ' + it.phoneModel].filter(Boolean).join(' · ') })),
+      el('span', { text: rupiah(it.price * it.qty) }))));
+    const addr = el('p', { class: 'addr' },
+      el('b', { text: o.address.name + ' · ' + o.address.phone }),
+      '\n' + o.address.street + ', ' + o.address.city + ' ' + o.address.postal +
+      '\nKurir: ' + o.courier + ' · Bayar: ' + o.pay + (o.note ? '\nCatatan: ' + o.note : '') + (o.tracking ? '\nResi: ' + o.tracking : ''));
+    const card = el('article', { class: 'card' }, head, items, addr);
+    if (o.status === 'paid') {
+      const input = el('input', { type: 'text', placeholder: 'Nomor resi', 'aria-label': 'Nomor resi ' + o.id, maxlength: '60' });
+      const btn = el('button', { text: 'Tandai dikirim' });
+      const msg = el('p', { class: 'msg bad', role: 'alert' });
+      btn.addEventListener('click', async () => {
+        msg.textContent = '';
+        btn.disabled = true;
+        try { await api('POST', '/admin/orders/' + encodeURIComponent(o.id) + '/ship', { tracking: input.value }); loadOrders(); }
+        catch (err) { msg.textContent = err.message; btn.disabled = false; }
+      });
+      card.append(el('div', { class: 'ship' }, input, btn), msg);
+    }
+    return card;
+  }
+
+  async function loadOrders() {
+    const list = $('order-list');
+    try {
+      const status = $('filter').value;
+      const { orders } = await api('GET', '/admin/orders' + (status ? '?status=' + status : ''));
+      $('order-count').textContent = orders.length + ' pesanan';
+      list.replaceChildren(...(orders.length ? orders.map(orderCard) : [el('p', { class: 'empty', text: 'Belum ada pesanan di sini.' })]));
+    } catch (err) {
+      if (err.status === 401 || err.status === 403) return start();
+      list.replaceChildren(el('p', { class: 'empty', text: err.message }));
+    }
+  }
+  $('filter').addEventListener('change', loadOrders);
+  $('refresh').addEventListener('click', loadOrders);
+
+  /* Stock */
+  let saved = [];
+  function stockRow(s) {
+    const input = el('input', { type: 'number', min: '0', max: '100000', step: '1', inputmode: 'numeric', value: String(s.qty), 'aria-label': 'Jumlah ' + s.name + ' ' + (s.label || '') });
+    const row = el('tr', {}, el('td', { text: s.name.split(' | ')[0] }), el('td', { text: s.label || '-' }), el('td', { class: 'qty' }, input));
+    input.addEventListener('input', () => {
+      row.classList.toggle('changed', input.value !== String(s.qty));
+      $('save-stock').disabled = !document.querySelector('#stock-rows tr.changed');
+      $('stock-msg').textContent = '';
+    });
+    row.dataset.product = s.product;
+    row.dataset.variant = s.variant;
+    return row;
+  }
+  function renderStock(stock) {
+    saved = stock;
+    $('stock-rows').replaceChildren(...stock.map(stockRow));
+    $('save-stock').disabled = true;
+  }
+  async function loadStock() {
+    try { renderStock((await api('GET', '/admin/stock')).stock); }
+    catch (err) { if (err.status === 401 || err.status === 403) return start(); $('stock-msg').className = 'msg bad'; $('stock-msg').textContent = err.message; }
+  }
+  $('save-stock').addEventListener('click', async () => {
+    const items = [...document.querySelectorAll('#stock-rows tr.changed')].map((row) => ({ product: row.dataset.product, variant: row.dataset.variant, qty: Number(row.querySelector('input').value) }));
+    const msg = $('stock-msg');
+    if (items.some((it) => !Number.isInteger(it.qty) || it.qty < 0)) { msg.className = 'msg bad'; msg.textContent = 'Jumlah harus angka bulat, minimal 0.'; return; }
+    try {
+      renderStock((await api('PUT', '/admin/stock', { items })).stock);
+      msg.className = 'msg ok';
+      msg.textContent = 'Tersimpan.';
+    } catch (err) { msg.className = 'msg bad'; msg.textContent = err.message; }
+  });
+
+  /* Tabs */
+  for (const name of ['orders', 'stock']) {
+    $('tab-' + name).addEventListener('click', () => {
+      for (const other of ['orders', 'stock']) { $(other).hidden = other !== name; $('tab-' + other).setAttribute('aria-selected', String(other === name)); }
+      if (name === 'stock') loadStock(); else loadOrders();
+    });
+  }
+
+  start();
+})();
+</script>
+</body>
+</html>

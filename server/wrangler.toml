@@ -2,9 +2,18 @@ name = "nexura"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
 
-# Daily clean-up of finished sessions and old attempt records (03:00 WIB).
+# The site's pages are copied into ./site before each deploy (scripts/build-site.mjs leaves out
+# everything that is not public); anything under /api/ goes to the Worker.
+[build]
+command = "node scripts/build-site.mjs"
+
+[assets]
+directory = "./site"
+run_worker_first = ["/api/*"]
+
+# Every 5 minutes: unpaid orders past their window give their stock back; old sessions are cleared.
 [triggers]
-crons = ["0 20 * * *"]
+crons = ["*/5 * * * *"]
 
 # database_id is filled in once the database exists in the Cloudflare account.
 [[d1_databases]]

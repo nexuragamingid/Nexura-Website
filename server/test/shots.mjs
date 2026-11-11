@@ -1,0 +1,54 @@
+// Opens the admin page in a real browser against the local server and saves screenshots.
+import puppeteer from 'puppeteer-core';
+import { execSync } from 'node:child_process';
+const [BASE, OUT] = process.argv.slice(2);
+const sql = (c) => execSync(`npx wrangler d1 execute nexura --local --command "${c}"`, { cwd: new URL('..', import.meta.url), stdio: 'pipe', env: { ...process.env, CI: '1' } });
+const post = (path, body, cookie) => fetch(BASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) });
+const addr = { name: 'Rina <script>alert(1)</script>', phone: '081234567890', street: 'Jl. Kemang Raya No. 12 <img src=x onerror=alert(2)>', city: 'Jakarta Selatan', postal: '12730' };
+await post('/api/auth/signup', { name: 'Admin Nexura', email: 'admin@example.com', phone: '081200000000', password: 'admin-lokal-123' });
+sql("UPDATE users SET is_admin = 1 WHERE email = 'admin@example.com'");
+const ids = [];
+for (const items of [[{ id: 'iceglow', variant: 'ungu', qty: 2 }, { id: 'hydrogel-matte', variant: 'fullscreen', qty: 1, phoneModel: 'iPhone 15 Pro' }], [{ id: 'vortex', variant: 'merah', qty: 3 }]]) {
+  const r = await (await post('/api/orders', { items, courier: 'reguler', insured: true, pay: 'qris', note: 'Tolong bubble wrap', address: addr })).json();
+  ids.push(r.order.id);
+}
+sql(`UPDATE orders SET status = 'paid', paid_at = 1 WHERE id IN ('${ids.join("','")}')`);
+
+const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--no-proxy-server'] });
+const page = await browser.newPage();
+const errors = [];
+let dialogs = 0;
+page.on('pageerror', (e) => errors.push(String(e)));
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('dialog', async (d) => { dialogs += 1; await d.dismiss(); });
+await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
+await page.goto(BASE + '/admin/', { waitUntil: 'networkidle0' });
+await page.screenshot({ path: `${OUT}/admin-1-login.png` });
+await page.type('#email', 'admin@example.com');
+await page.type('#password', 'salah-password');
+await page.click('#login button');
+await page.waitForFunction(() => document.getElementById('login-msg').textContent);
+const wrong = await page.$eval('#login-msg', (n) => n.textContent);
+await page.$eval('#password', (n) => { n.value = ''; });
+await page.type('#password', 'admin-lokal-123');
+await page.click('#login button');
+await page.waitForSelector('#order-list article');
+await page.screenshot({ path: `${OUT}/admin-2-orders-phone.png`, fullPage: true });
+const scriptTags = await page.$$eval('#order-list script, #order-list img', (n) => n.length);
+await page.type('#order-list article input', 'JNE0012345678');
+await page.click('#order-list article .ship button');
+await page.waitForFunction(() => document.querySelectorAll('#order-list article').length === 1);
+await page.click('#tab-stock');
+await page.waitForSelector('#stock-rows tr');
+const rows = await page.$$eval('#stock-rows tr', (n) => n.length);
+const input = await page.$('#stock-rows tr input');
+await input.click({ clickCount: 3 });
+await input.type('7');
+await page.click('#save-stock');
+await page.waitForFunction(() => document.getElementById('stock-msg').textContent === 'Tersimpan.');
+const firstQty = await page.$eval('#stock-rows tr input', (n) => n.value);
+await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 });
+await page.screenshot({ path: `${OUT}/admin-3-stock-desktop.png` });
+const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+console.log(JSON.stringify({ wrong, scriptTags, dialogs, rows, firstQty, overflow, errors }));
+await browser.close();

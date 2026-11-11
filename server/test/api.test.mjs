@@ -1,6 +1,10 @@
 // End-to-end checks against a local `wrangler dev`.   node test/api.test.mjs <base url> <sensi code> <second code>
 // Each check is something an attacker or a bug would try; the run fails loudly if one gets through.
-const [BASE = 'http://localhost:8787', CODE_A, CODE_B] = process.argv.slice(2);
+import { execSync } from 'node:child_process';
+
+const [BASE = 'http://localhost:8787', CODE_A, CODE_B, SHARED] = process.argv.slice(2);
+// Stands in for things only the owner or the payment gateway can do: a direct change in the database.
+const sql = (command) => execSync(`npx wrangler d1 execute nexura --local --command "${command}"`, { cwd: new URL('..', import.meta.url), stdio: 'pipe', env: { ...process.env, CI: '1' } });
 let failed = 0;
 let passed = 0;
 function check(name, ok, detail = '') {
@@ -39,6 +43,7 @@ const ani = browser();
 const budi = browser();
 const guest = browser();
 const stranger = browser();
+const guest2 = browser();
 
 console.log('Accounts');
 let r = await ani('POST', '/api/auth/signup', { name: 'Ani Wijaya', email: mailA, phone: '081234567890', password: 'rahasia-ani-1' });
@@ -127,7 +132,7 @@ if (CODE_A && CODE_B) {
   r = await stranger('POST', '/api/sensi/claim', { code: 'NX-0000-0000' });
   check('a made-up code is refused', r.status === 404);
   r = await ani('POST', '/api/sensi/claim', { code: CODE_A.toLowerCase().replace(/-/g, ' ') });
-  check('a real code opens a player (case and spacing forgiven)', r.status === 200 && !!r.data.sensi.player.name, JSON.stringify(r.data));
+  check('a real code opens a player (case and spacing forgiven)', r.status === 200 && !!r.data.sensi[0].player.name, JSON.stringify(r.data));
   r = await ani('POST', '/api/sensi/claim', { code: CODE_A });
   check('the owner can open it again', r.status === 200);
   r = await budi('POST', '/api/sensi/claim', { code: CODE_A });
@@ -136,12 +141,65 @@ if (CODE_A && CODE_B) {
   check('...and sees nothing of it', r.data.sensi.length === 0);
   const both = await Promise.all([browser()('POST', '/api/sensi/claim', { code: CODE_B }), browser()('POST', '/api/sensi/claim', { code: CODE_B })]);
   check('two claims at the same instant: exactly one wins', both.filter((x) => x.status === 200).length === 1, both.map((x) => x.status).join(','));
+  r = await guest2('POST', '/api/sensi/claim', { code: SHARED });
+  check('the shared pack QR needs an account', r.status === 401 && r.data.error === 'sign_in_required', JSON.stringify(r.data));
+  r = await budi('POST', '/api/sensi/claim', { code: SHARED.toLowerCase() });
+  check('...and opens every player for a signed-in user', r.status === 200 && r.data.sensi.length === 6, JSON.stringify(r.data).slice(0, 200));
+  await budi('POST', '/api/sensi/claim', { code: SHARED });
+  r = await budi('GET', '/api/sensi');
+  check('...once each, however often it is scanned', r.data.sensi.length === 6, String(r.data.sensi.length));
   let last;
   for (let i = 0; i < 12; i += 1) last = await stranger('POST', '/api/sensi/claim', { code: `NX-AAAA-AA${String(i).padStart(2, '0')}` });
   check('guessing codes gets cut off', last.status === 429, String(last.status));
 } else {
   console.log('  (skipped: no codes given)');
 }
+
+console.log('Admin');
+r = await budi('GET', '/api/admin/orders');
+check('an ordinary account is kept out of admin', r.status === 403);
+r = await stranger('GET', '/api/admin/stock');
+check('a visitor is kept out of admin', r.status === 401);
+r = await budi('PATCH', '/api/me', { name: 'Budi Santoso', is_admin: 1, admin: true });
+r = await budi('GET', '/api/admin/stock');
+check('nobody can make themselves admin from the site', r.status === 403);
+sql(`UPDATE users SET is_admin = 1 WHERE email = '${mailA}'`);
+r = await ani('GET', '/api/admin/orders');
+check('an admin sees every order', r.status === 200 && r.data.orders.some((o) => o.id === orderG) && r.data.orders.some((o) => o.id === orderA));
+r = await ani('POST', `/api/admin/orders/${orderA}/ship`, { tracking: 'JNE123456789' });
+check('an unpaid order cannot be shipped', r.status === 409 && r.data.error === 'not_paid');
+sql(`UPDATE orders SET status = 'paid', paid_at = 1 WHERE id = '${orderA}'`); // what the gateway callback will do
+r = await ani('POST', `/api/admin/orders/${orderA}/ship`, { tracking: 'JNE123456789' });
+r = await ani('GET', `/api/orders/${orderA}`);
+check('a paid order can, and the buyer sees the tracking number', r.data.order.status === 'shipped' && r.data.order.tracking === 'JNE123456789', JSON.stringify(r.data.order.status));
+
+console.log('Stock');
+const qtyOf = async (product, variant) => (await ani('GET', '/api/admin/stock')).data.stock.find((x) => x.product === product && x.variant === variant).qty;
+const stateOf = async (product, variant) => (await stranger('GET', '/api/catalog')).data.products.find((p) => p.id === product).variants.find((v) => v.id === variant).stock;
+const reflex = (variant, qty) => ({ ...cartOk, items: [{ id: 'reflex', variant, qty }] });
+r = await ani('PUT', '/api/admin/stock', { items: [{ product: 'reflex', variant: 'kuning', qty: 2 }, { product: 'reflex', variant: 'hijau', qty: 1 }, { product: 'reflex', variant: 'biru', qty: 3 }] });
+check('admin sets the allotment', r.status === 200 && await qtyOf('reflex', 'kuning') === 2);
+r = await ani('PUT', '/api/admin/stock', { items: [{ product: 'reflex', variant: 'kuning', qty: -1 }] });
+check('refused: negative stock', r.status === 400);
+r = await ani('PUT', '/api/admin/stock', { items: [{ product: 'tidak-ada', variant: '', qty: 5 }] });
+check('refused: stock for a product that does not exist', r.status === 400);
+r = await budi('POST', '/api/orders', reflex('kuning', 2));
+const orderStock = r.data.order?.id;
+check('an order takes its units at once', r.status === 201 && await qtyOf('reflex', 'kuning') === 0);
+check('...and the pages show the variant as sold out', await stateOf('reflex', 'kuning') === 'out');
+r = await stranger('POST', '/api/orders', reflex('kuning', 1));
+check('...so the next buyer is refused', r.status === 409 && r.data.error === 'out_of_stock');
+sql(`UPDATE orders SET expires_at = 1 WHERE id = '${orderStock}'`); // its 15 minutes are up
+check('unpaid past its window: the units come back', await stateOf('reflex', 'kuning') === 'low' && await qtyOf('reflex', 'kuning') === 2);
+await stranger('GET', '/api/catalog');
+check('...once, not every time someone looks', await qtyOf('reflex', 'kuning') === 2);
+r = await budi('GET', `/api/orders/${orderStock}`);
+check('...and the order shows as expired', r.data.order.status === 'expired');
+const race = await Promise.all([browser()('POST', '/api/orders', reflex('hijau', 1)), browser()('POST', '/api/orders', reflex('hijau', 1))]);
+check('two buyers, one unit left, same instant: one order', race.filter((x) => x.status === 201).length === 1 && race.filter((x) => x.status === 409).length === 1, race.map((x) => x.status).join(','));
+check('...and stock never goes below zero', await qtyOf('reflex', 'hijau') === 0);
+r = await budi('POST', '/api/orders', { ...cartOk, items: [{ id: 'reflex', variant: 'biru', qty: 2 }, { id: 'reflex', variant: 'biru', qty: 2 }] });
+check('splitting one variant over two lines does not get past the count', r.status === 409 && await qtyOf('reflex', 'biru') === 3, String(r.status));
 
 console.log('Passwords');
 r = await ani('POST', '/api/me/password', { current: 'salah-banget', next: 'rahasia-ani-2' });
