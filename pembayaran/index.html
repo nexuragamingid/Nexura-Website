@@ -218,15 +218,15 @@
             <div class="pay-qr__sheet" data-pay-sheet>
               <img class="pay-qr__mark" src="../assets/img/pay/qris.png" alt="QRIS" width="255" height="130">
               <div class="pay-qr__code">
-                <!-- TODO: placeholder. The gateway returns one QR per order (dynamic QRIS, the
-                     amount inside it); draw that here instead. -->
+                <!-- This picture is a stand-in for the practice site. With the payment gateway
+                     connected, main.js draws the order's own QR (dynamic QRIS, amount inside) over it. -->
                 <img src="../assets/img/pay/qr-order.png" alt="Kode QRIS untuk pesanan ini" width="600" height="600" data-pay-qr>
                 <p class="pay-qr__expired" data-pay-expired hidden>
                   <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>QR sudah kedaluwarsa
                 </p>
               </div>
-              <!-- TODO: the real NMID from the payment gateway once QRIS is activated. -->
-              <p class="pay-qr__nmid">NMID: ID10XXXXXXXXXXX</p>
+              <!-- Stand-in text; replaced with the NMID read from the order's QR. -->
+              <p class="pay-qr__nmid" data-pay-nmid>NMID: ID10XXXXXXXXXXX</p>
             </div>
             <p class="pay-qr__apps">Bisa dibayar pakai GoPay, OVO, DANA, ShopeePay, atau aplikasi m-banking mana pun.</p>
           </section>
@@ -255,7 +255,7 @@
             <ol class="pay-steps__list">
               <li>Simpan atau screenshot kode QR, yang berlaku selama <span data-pay-minutes>15</span> menit. Kalau waktunya habis, kamu bisa buat QR baru.</li>
               <li>Scan kode QR pakai m-banking, e-wallet, atau aplikasi pembayaran lain.</li>
-              <li>Pastikan merchant-nya <strong>NEXURA GEAR</strong> dan totalnya sesuai, lalu lanjutkan pembayaran.</li>
+              <li>Pastikan merchant-nya <strong data-pay-merchant>NEXURA GEAR</strong> dan totalnya sesuai, lalu lanjutkan pembayaran.</li>
               <li>Setelah berhasil, tekan <strong>Cek Status</strong>.</li>
               <li>Simpan bukti pembayaran buat verifikasi kalau diperlukan.</li>
               <li>Pembayaran nggak bisa diproses kalau pakai aplikasi yang nggak mendukung QRIS.</li>
@@ -371,7 +371,8 @@
   <div class="backdrop" data-backdrop hidden></div>
   <div class="sr-only" aria-live="polite" data-live></div>
 
+  <script src="../assets/js/vendor/qrcode-generator.js"></script>
   <script src="../assets/js/data.js?v=20261111120000"></script>
-  <script src="../assets/js/main.js?v=20261111161000"></script>
+  <script src="../assets/js/main.js?v=20261120100000"></script>
 </body>
 </html>

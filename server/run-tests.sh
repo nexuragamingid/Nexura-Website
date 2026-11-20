@@ -30,6 +30,18 @@ npx wrangler d1 execute nexura-staging --local --command "INSERT OR IGNORE INTO 
 for f in out/test01-jeje.sql out/shared.sql; do npx wrangler d1 execute nexura-staging --local --file "$f" > /dev/null; done
 node test/api.test.mjs "$BASE" "$(sed -n 2p out/test01-jeje.csv)" "$(sed -n 3p out/test01-jeje.csv)" NEXURA-SENSI-2026
 
+# The payment gateway, against a stand-in Duitku (test/mock-duitku.mjs) with made-up keys.
+MOCK_PORT=8799; MOCK="http://localhost:$MOCK_PORT"; DCODE="DTEST"; DKEY="kunci-tes-bukan-asli"
+node test/mock-duitku.mjs $MOCK_PORT $DCODE $DKEY "$BASE" >> out/mock.log 2>&1 &
+MOCK_PID=$!
+trap 'kill $MOCK_PID 2>/dev/null || true; stop_server' EXIT
+GATEWAY_VARS="DUITKU_MERCHANT_CODE=\"$DCODE\"
+DUITKU_API_KEY=\"$DKEY\"
+DUITKU_BASE_URL=\"$MOCK\""
+start_server "$GATEWAY_VARS"
+npx wrangler d1 execute nexura-staging --local --command "DELETE FROM rate_events" > /dev/null
+node test/duitku.test.mjs "$BASE" "$MOCK" $DCODE $DKEY
+
 if [ "${1:-}" = "pages" ]; then
   # Practice payments on, as on a developer's computer, so the flow can be paid through.
   start_server 'DEMO_PAYMENTS="yes"'
@@ -37,4 +49,7 @@ if [ "${1:-}" = "pages" ]; then
   node test/account-pages.mjs "$BASE" "$2"
   node test/shop-pages.mjs "$BASE" "$2"
   node test/shots.mjs "$BASE" "$2"
+  start_server "$GATEWAY_VARS"
+  npx wrangler d1 execute nexura-staging --local --command "DELETE FROM rate_events" > /dev/null
+  node test/duitku-pages.mjs "$BASE" "$MOCK" "$2"
 fi

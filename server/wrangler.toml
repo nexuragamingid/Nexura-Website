@@ -21,6 +21,9 @@ crons = ["*/5 * * * *"]
 [vars]
 ENVIRONMENT = "staging"
 DEMO_PAYMENTS = "yes"   # the "Simulasi bayar" button; the Worker also checks the address
+DUITKU_ENV = "sandbox"  # staging pays through Duitku's sandbox, never the live gateway
+# The Duitku merchant code and API key are secrets, set in the Cloudflare dashboard
+# (DUITKU_MERCHANT_CODE, DUITKU_API_KEY). Without them the QR on the payment page is a placeholder.
 
 # The staging database in the Cloudflare account (the id is an address, not a secret).
 [[d1_databases]]

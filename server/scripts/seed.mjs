@@ -29,7 +29,9 @@ checkout.couriers.forEach((c, i) => out.push(row('couriers', ['id', 'label', 'pr
 for (const [code, p] of Object.entries(checkout.promos)) out.push(row('promos', ['code', 'label', 'off'], [code.toUpperCase(), p.label, p.off]));
 out.push(row('settings', ['key', 'value'], ['insurance', JSON.stringify(checkout.insurance)]));
 out.push(row('settings', ['key', 'value'], ['qrisMinutes', JSON.stringify(checkout.qrisMinutes)]));
-out.push(row('settings', ['key', 'value'], ['payments', JSON.stringify(checkout.payments.map((p) => p.id))]));
+// Only QRIS has a payment page (and every e-wallet app can pay a QRIS code); the pages list
+// whatever this setting holds.
+out.push(row('settings', ['key', 'value'], ['payments', JSON.stringify(checkout.payments.map((p) => p.id).filter((id) => id === 'qris'))]));
 // The site no longer carries sensi data (the pack QR opens a Drive link); kept for a future pack with its own code.
 for (const p of sensi?.players || []) out.push(row('sensi_players', ['id', 'name', 'role', 'image', 'settings'], [p.id, p.name, p.role, p.image, JSON.stringify(p.settings)]));
 

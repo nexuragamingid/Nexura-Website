@@ -234,8 +234,10 @@
     },
     remember(user) {
       if (user) { storage.set(ME_KEY, user); return; }
-      // Signed out: the profile copy goes, and so do the orders this browser was showing.
-      try { [ME_KEY, ORDERS_KEY, ORDER_KEY].forEach((k) => localStorage.removeItem(k)); } catch { /* nothing to clear */ }
+      // Signed out: the profile copy goes, and so do the orders this browser was showing for
+      // that account. A guest who was never signed in keeps theirs (the order they are paying).
+      const wasSignedIn = !!storage.get(ME_KEY);
+      try { (wasSignedIn ? [ME_KEY, ORDERS_KEY, ORDER_KEY] : [ME_KEY]).forEach((k) => localStorage.removeItem(k)); } catch { /* nothing to clear */ }
     },
     // Asks the server who is signed in. true when that differs from what the page was drawn with.
     async refresh() {
@@ -299,7 +301,7 @@
     const courier = window.NEXURA.checkout.couriers.find((c) => c.id === o.courier);
     return {
       id: o.id, pay: o.pay, created: o.created, expires: o.expires, paid: o.paid || 0,
-      status: o.status, shipped: o.shipped || 0, tracking: o.tracking || '',
+      status: o.status, shipped: o.shipped || 0, tracking: o.tracking || '', qr: o.qr || '',
       items: o.items.map((it) => {
         const p = byId[it.id];
         return {
@@ -2018,6 +2020,7 @@
         coTrouble(
           res.data.error === 'out_of_stock' ? `${p ? p.short : 'Salah satu produk'}${c ? ` ${c.label}` : ''} stoknya nggak cukup. Kurangi jumlahnya atau hapus dari keranjang, ya.`
             : res.status === 429 ? 'Terlalu banyak pesanan dari sini. Coba lagi nanti, ya.'
+            : res.data.error === 'payment_unavailable' ? 'Pembayaran lagi gangguan, pesananmu belum dibuat. Coba lagi sebentar, ya.'
             : res.data.error === 'invalid_field' && String(res.data.field).startsWith('address') ? 'Alamatnya belum lengkap. Cek lagi nama, nomor HP, dan kode posnya.'
             : res.data.error === 'invalid_field' ? 'Ada isian yang belum benar. Cek lagi keranjang dan tipe HP-nya.'
             : 'Pesanan belum bisa dibuat. Coba lagi sebentar, ya.',
@@ -2073,6 +2076,45 @@
       $('[data-pay-total]', payPage).textContent = rupiah(t.total);
       $('[data-pay-id]', payPage).textContent = order.id;
       saveBtn.download = `QRIS-${order.id}.png`;
+
+      /* The QR is this order's own, issued by the payment gateway: its text arrives with the
+         order and is drawn here (assets/js/vendor/qrcode-generator.js). Without a gateway, on
+         the practice site, the page keeps its placeholder picture. */
+      const emv = (text) => { // QRIS text is a run of fields: 2-digit id, 2-digit length, value
+        const out = {};
+        for (let i = 0; i + 4 <= text.length;) {
+          const len = Number(text.slice(i + 2, i + 4));
+          if (!Number.isInteger(len)) break;
+          out[text.slice(i, i + 2)] = text.slice(i + 4, i + 4 + len);
+          i += 4 + len;
+        }
+        return out;
+      };
+      if (order.qr && typeof qrcode === 'function') {
+        const qr = qrcode(0, 'M');
+        qr.addData(order.qr);
+        qr.make();
+        const n = qr.getModuleCount();
+        const quiet = 4; // the blank margin scanners need
+        const scale = Math.max(4, Math.floor(720 / (n + quiet * 2)));
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = (n + quiet * 2) * scale;
+        const ink = canvas.getContext('2d');
+        ink.fillStyle = '#fff';
+        ink.fillRect(0, 0, canvas.width, canvas.height);
+        ink.fillStyle = '#000';
+        for (let r = 0; r < n; r += 1) for (let c = 0; c < n; c += 1) if (qr.isDark(r, c)) ink.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+        const png = canvas.toDataURL('image/png');
+        $('[data-pay-qr]', payPage).src = png;
+        saveBtn.href = png;
+        // The merchant name and NMID a buyer should see in their banking app are inside the QR.
+        const fields = emv(order.qr);
+        const nmid = emv(fields['51'] || '')['02'];
+        const nmidLine = $('[data-pay-nmid]', payPage);
+        nmidLine.textContent = nmid ? `NMID: ${nmid}` : '';
+        nmidLine.hidden = !nmid;
+        if (fields['59']) $('[data-pay-merchant]', payPage).textContent = fields['59'];
+      }
 
       /* Time left. Counted from the saved deadline, so a reload doesn't restart it. */
       const dueFmt = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -2137,6 +2179,9 @@
       // Whether it is paid is the server's to say (it hears it from the gateway), never this page's.
       // Asked when Cek Status is pressed, and quietly every few seconds while the page is open.
       const ask = async () => { const res = await api('GET', `orders/${encodeURIComponent(order.id)}`); return res.ok ? res.data.order : null; };
+      // Cek Status goes one step further: the server asks the gateway itself, in case the
+      // gateway's own report of the payment has not reached it.
+      const askGateway = async () => { const res = await api('POST', `orders/${encodeURIComponent(order.id)}/check`, {}); return res.ok ? res.data.order : null; };
       const settle = (now) => {
         if (!now) return false;
         if (now.status === 'paid' || now.status === 'shipped') { markPaid(now.paid); return true; }
@@ -2148,7 +2193,7 @@
         checkBtn.disabled = true;
         checkBtn.setAttribute('aria-busy', 'true');
         checkText.textContent = 'Mengecek…';
-        if (settle(await ask())) return;
+        if (settle(await askGateway())) return;
         checkBtn.disabled = false;
         checkBtn.removeAttribute('aria-busy');
         checkText.textContent = 'Belum masuk'; // short: on phones the button is half the bar

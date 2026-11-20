@@ -8,7 +8,8 @@
  *   - Anything guessable (passwords, codes) sits behind an attempt limit.
  */
 
-import { VERSION, SCHEMA, SEED } from './generated.js';
+import { VERSION, SCHEMA, MIGRATIONS, SEED } from './generated.js';
+import * as duitku from './duitku.js';
 
 const SESSION_COOKIE = 'nx_session';
 const GUEST_COOKIE = 'nx_guest';
@@ -35,8 +36,12 @@ async function ready(db) {
   let have = null;
   try { have = (await db.prepare("SELECT value FROM settings WHERE key = 'schema_version'").first())?.value; } catch { /* first run: no tables yet */ }
   if (have !== JSON.stringify(VERSION)) {
-    const steps = [...SCHEMA, ...SEED].map((q) => db.prepare(q));
-    for (let i = 0; i < steps.length; i += 40) await db.batch(steps.slice(i, i + 40));
+    const run = async (list) => { const steps = list.map((q) => db.prepare(q)); for (let i = 0; i < steps.length; i += 40) await db.batch(steps.slice(i, i + 40)); };
+    await run(SCHEMA);
+    for (const q of MIGRATIONS) {
+      try { await db.prepare(q).run(); } catch (e) { if (!/duplicate column/i.test(String(e.message))) throw e; }
+    }
+    await run(SEED);
     await db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('schema_version', ?)").bind(JSON.stringify(VERSION)).run();
   }
   readyFor = VERSION;
@@ -330,6 +335,7 @@ async function loadShop(db) {
   return { products: products.results, variants: variants.results, left, couriers: couriers.results, promos: promos.results, cfg };
 }
 const LOW_STOCK = 3;
+const RELEASE_GRACE = 5 * MIN;
 // What the pages are told: enough to show a badge, not the exact count.
 const stockState = (qty = 0) => (qty <= 0 ? 'out' : qty <= LOW_STOCK ? 'low' : 'in');
 
@@ -337,7 +343,9 @@ const stockState = (qty = 0) => (qty <= 0 ? 'out' : qty <= LOW_STOCK ? 'low' : '
    update and the status change are one transaction, and both look at the order still being
    'pending', so running this twice (or at the same moment) returns the units once. */
 async function releaseExpired(db) {
-  const now = Date.now();
+  // The QR stops working at expires_at, but a payment made in its last seconds can be reported
+  // a little later, so the stock is held for a few minutes more before it goes back.
+  const now = Date.now() - RELEASE_GRACE;
   const { results } = await db.prepare("SELECT id FROM orders WHERE status = 'pending' AND expires_at < ? LIMIT 50").bind(now).all();
   for (const { id } of results) {
     await db.batch([
@@ -364,6 +372,7 @@ async function catalog(ctx) {
     insurance: shop.cfg.insurance,
     payments: shop.cfg.payments,
     qrisMinutes: shop.cfg.qrisMinutes,
+    gateway: duitku.configured(ctx.env),
     ...(demoPayments(ctx) ? { demoPayments: true } : {}),
   });
 }
@@ -431,11 +440,29 @@ async function createOrder(ctx) {
   const priced = priceOrder(shop, body);
   const addr = address(body.address);
   const note = str(body.note).slice(0, 200);
+  const user = await currentUser(ctx);
   const holder = await holderOf(ctx, { create: true });
   const id = orderId();
   const now = Date.now();
   const t = priced.totals;
   await record(ctx.db, `order:${ctx.ip}`);
+  // With the gateway connected, the payment is made there first: no QR, no order. (Should the
+  // order then fail to save, the QR is never shown to anyone and simply runs out.)
+  let pay = null;
+  if (duitku.configured(ctx.env)) {
+    pay = await duitku.createQris(ctx.env, {
+      orderId: id, amount: t.total, minutes: shop.cfg.qrisMinutes, name: addr.name, phone: addr.phone,
+      // A guest gives no email at checkout; the shop's own address stands in for them.
+      email: user ? user.email : (ctx.env.ORDER_EMAIL || 'order@nexuragear.com'),
+      callbackUrl: `${ctx.url.origin}/api/payments/duitku/callback`,
+      returnUrl: `${ctx.url.origin}/pembayaran/?id=${id}`,
+      preferred: shop.cfg.duitkuQris,
+    });
+    if (!pay) throw new HttpError(502, 'payment_unavailable');
+    if (pay.method !== shop.cfg.duitkuQris) {
+      await ctx.db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('duitkuQris', ?)").bind(JSON.stringify(pay.method)).run();
+    }
+  }
   // One transaction: the units are taken and the order written together, or neither happens.
   // If someone else took the last unit a moment ago, the stock CHECK fails and nothing is saved.
   try {
@@ -443,10 +470,10 @@ async function createOrder(ctx) {
     ...priced.lines.map((l) => ctx.db.prepare('UPDATE stock SET qty = qty - ? WHERE product_id = ? AND variant_id = ?').bind(l.qty, l.product_id, l.variant_id || '')),
     ctx.db.prepare(
       `INSERT INTO orders (id, holder, status, goods, shipping, insurance, discount, total, courier_id, pay_method, promo_code, note,
-                           addr_name, addr_phone, addr_street, addr_city, addr_postal, created_at, expires_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                           addr_name, addr_phone, addr_street, addr_city, addr_postal, created_at, expires_at, gateway_ref, qr_string)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(id, holder, t.goods, t.shipping, t.insurance, t.discount, t.total, priced.courier.id, body.pay, priced.promo ? priced.promo.code : null, note,
-      addr.name, addr.phone, addr.street, addr.city, addr.postal, now, now + shop.cfg.qrisMinutes * MIN),
+      addr.name, addr.phone, addr.street, addr.city, addr.postal, now, now + shop.cfg.qrisMinutes * MIN, pay ? pay.reference : null, pay ? pay.qr : null),
     ...priced.lines.map((l, i) => ctx.db.prepare(
       'INSERT INTO order_items (order_id, line, product_id, variant_id, name, variant, phone_model, qty, unit_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).bind(id, i, l.product_id, l.variant_id, l.name, l.variant, l.phone_model, l.qty, l.unit_price)),
@@ -469,6 +496,7 @@ async function orderView(db, order) {
   return {
     id: order.id, status, created: order.created_at, expires: order.expires_at, paid: order.paid_at,
     shipped: order.shipped_at, tracking: order.tracking_no,
+    ...(status === 'pending' && order.qr_string ? { qr: order.qr_string } : {}),
     pay: order.pay_method, courier: order.courier_id, note: order.note, promo: order.promo_code,
     totals: { goods: order.goods, shipping: order.shipping, insurance: order.insurance, discount: order.discount, total: order.total },
     address: { name: order.addr_name, phone: order.addr_phone, street: order.addr_street, city: order.addr_city, postal: order.addr_postal },
@@ -494,11 +522,73 @@ async function listOrders(ctx) {
 
 /* ------------------------------ payment ------------------------------ */
 
-// The one place an order becomes paid. Only a pending order can: its units are still held
-// (an expired order has already given them back), so nothing is sold that is not there.
-async function markPaid(db, id, ref) {
-  const res = await db.prepare("UPDATE orders SET status = 'paid', paid_at = ?, gateway_ref = ? WHERE id = ? AND status = 'pending'").bind(Date.now(), ref, id).run();
-  return res.meta.changes === 1;
+/* The one place an order becomes paid. Answers what happened:
+     'paid'      it was waiting, and now it is paid (its stock was already held)
+     'late'      it had run out and given its stock back; the money came anyway, so the stock is
+                 taken again, or, if someone else has it by now, the order is flagged for the shop
+     'already'   it was paid before (the gateway may tell us twice)
+     'none'      no such order, or one that was cancelled */
+async function settlePayment(db, id, ref) {
+  const now = Date.now();
+  const res = await db.prepare("UPDATE orders SET status = 'paid', paid_at = ?, gateway_ref = COALESCE(?, gateway_ref) WHERE id = ? AND status = 'pending'").bind(now, ref, id).run();
+  if (res.meta.changes === 1) return 'paid';
+  const order = await db.prepare('SELECT status FROM orders WHERE id = ?').bind(id).first();
+  if (!order) return 'none';
+  if (order.status === 'paid' || order.status === 'shipped') return 'already';
+  if (order.status !== 'expired') return 'none';
+  const { results: lines } = await db.prepare('SELECT product_id, variant_id, qty FROM order_items WHERE order_id = ?').bind(id).all();
+  const stillExpired = "EXISTS (SELECT 1 FROM orders o WHERE o.id = ?1 AND o.status = 'expired')";
+  try {
+    // One transaction, and every step looks at the order still being 'expired', so two reports
+    // of the same payment take the stock once.
+    await db.batch([
+      ...lines.map((l) => db.prepare(`UPDATE stock SET qty = qty - ?2 WHERE product_id = ?3 AND variant_id = ?4 AND ${stillExpired}`).bind(id, l.qty, l.product_id, l.variant_id || '')),
+      db.prepare("UPDATE orders SET status = 'paid', paid_at = ?2, gateway_ref = COALESCE(?3, gateway_ref) WHERE id = ?1 AND status = 'expired'").bind(id, now, ref),
+    ]);
+  } catch (e) {
+    if (!String(e.message).includes('CHECK')) throw e;
+    await db.prepare("UPDATE orders SET status = 'paid', paid_at = ?2, gateway_ref = COALESCE(?3, gateway_ref), flag = 'stock_short' WHERE id = ?1 AND status = 'expired'").bind(id, now, ref).run();
+  }
+  return 'late';
+}
+
+/* Duitku's report of a payment. Believed only when all of these hold: it is signed with our
+   key, it names an order of ours, the amount is that order's total, and Duitku, asked directly,
+   says the same. Nothing the buyer's browser sends is involved. */
+async function duitkuCallback(ctx) {
+  if (!duitku.configured(ctx.env)) throw new HttpError(503, 'not_configured');
+  await limit(ctx.db, `cb:${ctx.ip}`, 30, 15 * MIN);
+  const data = await duitku.verifyCallback(ctx.env, ctx.request);
+  if (!data) {
+    await record(ctx.db, `cb:${ctx.ip}`);
+    throw new HttpError(400, 'bad_signature');
+  }
+  const order = await ctx.db.prepare('SELECT id, total FROM orders WHERE id = ?').bind(data.orderId).first();
+  if (!order) throw new HttpError(404, 'not_found');
+  if (Number(data.amount) !== order.total) throw new HttpError(400, 'amount_mismatch');
+  if (data.resultCode !== '00') return json(ctx, 200, { ok: true }); // a failed payment: the order runs out by itself
+  const asked = await duitku.status(ctx.env, order.id);
+  if (asked.state === 'pending' || asked.state === 'cancelled') throw new HttpError(409, 'not_paid');
+  if (asked.state === 'paid' && asked.amount !== order.total) throw new HttpError(400, 'amount_mismatch');
+  // 'unknown' (Duitku not answering just now) does not hold up a correctly signed report.
+  await settlePayment(ctx.db, order.id, data.reference || null);
+  return json(ctx, 200, { ok: true });
+}
+
+/* "Cek Status": asks Duitku about the buyer's own order, for the case where their report to
+   us went missing. A few times a minute per order at most; beyond that it answers from what
+   we already know. */
+async function checkOrder(ctx, id) {
+  const holder = await holderOf(ctx);
+  const row = holder && await ctx.db.prepare('SELECT id, total, status, gateway_ref FROM orders WHERE id = ? AND holder = ?').bind(id, holder).first();
+  if (!row) throw new HttpError(404, 'not_found');
+  if (duitku.configured(ctx.env) && row.gateway_ref && (row.status === 'pending' || row.status === 'expired')
+      && await attempts(ctx.db, `chk:${id}`, MIN) < 6) {
+    await record(ctx.db, `chk:${id}`);
+    const asked = await duitku.status(ctx.env, id);
+    if (asked.state === 'paid' && asked.amount === row.total) await settlePayment(ctx.db, id, asked.reference);
+  }
+  return json(ctx, 200, { order: await readOrder(ctx.db, id, holder) });
 }
 
 /* Practice payments, for clicking the flow through before the gateway is connected. They need
@@ -514,7 +604,7 @@ async function demoPay(ctx) {
   const holder = await holderOf(ctx);
   const order = holder && await readOrder(ctx.db, str(body.id), holder);
   if (!order) throw new HttpError(404, 'not_found');
-  if (!(await markPaid(ctx.db, order.id, 'demo'))) throw new HttpError(409, 'not_pending');
+  if (order.status !== 'pending' || await settlePayment(ctx.db, order.id, 'demo') !== 'paid') throw new HttpError(409, 'not_pending');
   return json(ctx, 200, { order: await readOrder(ctx.db, order.id, holder) });
 }
 
@@ -599,7 +689,7 @@ async function adminOrders(ctx) {
     ? ctx.db.prepare('SELECT * FROM orders WHERE status = ? ORDER BY created_at DESC LIMIT 200').bind(status)
     : ctx.db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 200')).all();
   const orders = [];
-  for (const row of results) orders.push({ ...(await orderView(ctx.db, row)), guest: row.holder.startsWith('g:') });
+  for (const row of results) orders.push({ ...(await orderView(ctx.db, row)), guest: row.holder.startsWith('g:'), ...(row.flag ? { flag: row.flag } : {}) });
   return json(ctx, 200, { orders });
 }
 
@@ -663,8 +753,8 @@ const routes = [
   ['GET', /^\/api\/admin\/stock$/, adminStock],
   ['PUT', /^\/api\/admin\/stock$/, adminSetStock],
   ['POST', /^\/api\/payments\/demo\/pay$/, demoPay],
-  // Payment gateway callback: not connected yet. Until it is, no order can become 'paid'.
-  ['POST', /^\/api\/payments\/duitku\/callback$/, () => { throw new HttpError(501, 'not_connected'); }],
+  ['POST', /^\/api\/orders\/(NXR-\d{6}-[0-9A-Z]{6})\/check$/, checkOrder],
+  ['POST', /^\/api\/payments\/duitku\/callback$/, duitkuCallback],
 ];
 
 export default {

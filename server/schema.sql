@@ -112,7 +112,9 @@ CREATE TABLE IF NOT EXISTS orders (
   addr_street   TEXT NOT NULL,
   addr_city     TEXT NOT NULL,
   addr_postal   TEXT NOT NULL,
-  gateway_ref   TEXT,
+  gateway_ref   TEXT,                       -- the gateway's own number for this payment
+  qr_string     TEXT,                       -- the QRIS text the gateway issued for this order
+  flag          TEXT,                       -- 'stock_short': paid late, after its stock went to someone else
   created_at    INTEGER NOT NULL,
   expires_at    INTEGER NOT NULL,
   paid_at       INTEGER,

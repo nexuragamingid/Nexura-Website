@@ -177,6 +177,8 @@
       '\n' + o.address.street + ', ' + o.address.city + ' ' + o.address.postal +
       '\nKurir: ' + o.courier + ' · Bayar: ' + o.pay + (o.note ? '\nCatatan: ' + o.note : '') + (o.tracking ? '\nResi: ' + o.tracking : ''));
     const card = el('article', { class: 'card' }, head, items, addr);
+    // Paid after its time ran out, when the stock had already gone to someone else.
+    if (o.flag === 'stock_short') card.append(el('p', { class: 'msg bad', text: 'Dibayar setelah waktunya habis dan stoknya sudah terpakai. Hubungi pembeli: kirim kalau barang ada, atau kembalikan uangnya.' }));
     if (o.status === 'paid') {
       const input = el('input', { type: 'text', placeholder: 'Nomor resi', 'aria-label': 'Nomor resi ' + o.id, maxlength: '60' });
       const btn = el('button', { text: 'Tandai dikirim' });

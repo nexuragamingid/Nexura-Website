@@ -35,9 +35,10 @@ await page.click('#login button');
 await page.waitForSelector('#order-list article');
 await page.screenshot({ path: `${OUT}/admin-2-orders-phone.png`, fullPage: true });
 const scriptTags = await page.$$eval('#order-list script, #order-list img', (n) => n.length);
+const paidBefore = await page.$$eval('#order-list article', (n) => n.length);
 await page.type('#order-list article input', 'JNE0012345678');
 await page.click('#order-list article .ship button');
-await page.waitForFunction(() => document.querySelectorAll('#order-list article').length === 1);
+await page.waitForFunction((n) => document.querySelectorAll('#order-list article').length === n - 1, {}, paidBefore); // the shipped one leaves the "paid" list
 await page.click('#tab-stock');
 await page.waitForSelector('#stock-rows tr');
 const rows = await page.$$eval('#stock-rows tr', (n) => n.length);
